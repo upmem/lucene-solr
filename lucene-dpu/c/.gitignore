@@ -1,0 +1,4 @@
+x86_poc/cmake-build-*
+x86_poc/.idea/
+dpu/cmake-build-*/
+dpu/.idea/
