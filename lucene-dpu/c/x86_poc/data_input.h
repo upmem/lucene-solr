@@ -15,8 +15,13 @@ typedef struct _data_input_t {
     void (*skip_bytes)(struct _data_input_t* self, uint32_t length);
 } data_input_t;
 
-void read_bytes(struct _data_input_t* self, uint8_t* dest, uint32_t length);
+data_input_t* data_input_clone(data_input_t* from);
+
+void read_bytes(struct _data_input_t* self, uint8_t* dest, uint32_t offset, uint32_t length);
+uint16_t read_short(data_input_t* input);
+uint32_t read_int(data_input_t* input);
 uint32_t read_vint(data_input_t* input);
+uint64_t read_vlong(data_input_t* input);
 char* read_string(data_input_t* input, uint32_t* length);
 
 uint8_t incremental_read_byte(data_input_t* input);

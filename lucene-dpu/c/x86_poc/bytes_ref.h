@@ -11,6 +11,12 @@ typedef struct {
     uint8_t* bytes;
     uint32_t offset;
     uint32_t length;
+    uint32_t capacity;
 } bytes_ref_t;
+
+extern const bytes_ref_t EMPTY_BYTES;
+
+bytes_ref_t* bytes_ref_add(bytes_ref_t* prefix, bytes_ref_t* output);
+void bytes_ref_grow(bytes_ref_t* bytes_ref, uint32_t capacity);
 
 #endif //X86_POC_BYTES_REF_H

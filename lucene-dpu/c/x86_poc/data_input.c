@@ -5,11 +5,27 @@
 #include <string.h>
 #include <stdlib.h>
 #include "data_input.h"
+#include "allocation.h"
 
-void read_bytes(data_input_t* input, uint8_t* dest, uint32_t length) {
+data_input_t* data_input_clone(data_input_t* from) {
+    data_input_t* result = allocation_get(sizeof(*result));
+    memcpy(result, from, sizeof(*from));
+    return result;
+}
+
+void read_bytes(data_input_t* input, uint8_t* dest, uint32_t offset, uint32_t length) {
     for (uint32_t i = 0; i < length; ++i) {
-        dest[i] = input->read_byte(input);
+        dest[offset + i] = input->read_byte(input);
     }
+}
+
+uint16_t read_short(data_input_t* input) {
+    return (uint16_t) (((input->read_byte(input) & 0xFF) << 8) | (input->read_byte(input) & 0xFF));
+}
+
+uint32_t read_int(data_input_t* input) {
+    return (uint32_t) (((input->read_byte(input) & 0xFF) << 24) | ((input->read_byte(input) & 0xFF) << 16)|
+        ((input->read_byte(input) & 0xFF) <<  8) | (input->read_byte(input) & 0xFF));
 }
 
 uint32_t read_vint(data_input_t* input) {
@@ -22,10 +38,20 @@ uint32_t read_vint(data_input_t* input) {
     return i;
 }
 
+uint64_t read_vlong(data_input_t* input) {
+    uint8_t b = input->read_byte(input);
+    uint64_t i = (uint64_t) (b & 0x7F);
+    for (uint32_t shift = 7; (b & 0x80) != 0; shift += 7) {
+        b = input->read_byte(input);
+        i |= (b & 0x7F) << shift;
+    }
+    return i;
+}
+
 char* read_string(data_input_t* input, uint32_t* length) {
     *length = read_vint(input);
-    char* string = malloc(*length);
-    read_bytes(input, (uint8_t *) string, *length);
+    char* string = allocation_get(*length);
+    read_bytes(input, (uint8_t *) string, 0, *length);
     return string;
 }
 
