@@ -3,6 +3,8 @@
  */
 
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "fst.h"
 #include "allocation.h"
 
@@ -38,9 +40,60 @@ static void skip_final_output(data_input_t* in);
 
 static void seek_to_next_node(fst_t* fst, data_input_t* in);
 
+static void cache_root_arcs(fst_t* fst);
+
 fst_t* fst_new(data_input_t* in) {
-    // todo
-    return NULL;
+    fst_t* result = allocation_get(sizeof(*result));
+
+    // todo check header
+
+    if (in->read_byte(in) == 1) {
+        int32_t num_bytes = read_vint(in);
+
+        if (num_bytes <= 0) {
+            result->empty_output = (bytes_ref_t *) &EMPTY_BYTES;
+        } else {
+            uint8_t* empty_bytes = allocation_get((size_t) num_bytes);
+
+            read_bytes(in, empty_bytes, 0, (uint32_t) num_bytes);
+
+            data_input_t reader = {
+                    .buffer = empty_bytes,
+                    .index = 0,
+                    .read_byte = decremental_read_byte,
+                    .skip_bytes = decremental_skip_bytes
+            };
+
+            result->empty_output = read_final_output(&reader);
+        }
+    } else {
+        result->empty_output = NULL;
+    }
+
+    uint8_t t = in->read_byte(in);
+    switch (t) {
+        case 0:
+            result->input_type = INPUT_TYPE_BYTE1;
+            break;
+        case 1:
+            result->input_type = INPUT_TYPE_BYTE2;
+            break;
+        case 2:
+            result->input_type = INPUT_TYPE_BYTE4;
+            break;
+        default:
+            fprintf(stderr, "invalid input type %d\n", t);
+            exit(1);
+    }
+    result->start_node = read_vlong(in);
+    int64_t num_bytes = read_vlong(in);
+
+    result->bytes_array = allocation_get((size_t) num_bytes);
+    read_bytes(in, result->bytes_array, 0, (uint32_t) num_bytes);
+
+    cache_root_arcs(result);
+
+    return result;
 }
 
 arc_t* get_first_arc(fst_t* fst, arc_t* arc) {
@@ -65,6 +118,10 @@ arc_t* get_first_arc(fst_t* fst, arc_t* arc) {
 
 arc_t* find_target_arc(fst_t* fst, int32_t label_to_match, arc_t* follow, arc_t* arc, data_input_t* in) {
     return _find_target_arc(fst, label_to_match, follow, arc, in, true);
+}
+
+static void cache_root_arcs(fst_t* fst) {
+    // todo
 }
 
 static inline arc_t* _find_target_arc(fst_t* fst, int32_t label_to_match, arc_t* follow, arc_t* arc, data_input_t* in, bool use_root_arc_cache) {
@@ -300,5 +357,12 @@ static void seek_to_next_node(fst_t* fst, data_input_t* in) {
 }
 
 data_input_t* fst_get_bytes_reader(fst_t* fst) {
-    // todo
+    data_input_t* result = allocation_get(sizeof(*result));
+
+    result->buffer = fst->bytes_array;
+    result->index = 0;
+    result->read_byte = decremental_read_byte;
+    result->skip_bytes = decremental_skip_bytes;
+
+    return result;
 }

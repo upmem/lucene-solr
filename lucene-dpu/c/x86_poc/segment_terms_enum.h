@@ -12,6 +12,7 @@
 
 typedef struct {
     fst_t* index;
+    uint32_t longs_size;
 } field_reader_t;
 
 typedef struct {
@@ -58,11 +59,20 @@ typedef struct {
 
     uint8_t* suffix_bytes;
     uint8_t* floor_data;
+    uint8_t* stat_bytes;
+    int64_t* longs;
+    uint8_t* bytes;
 
+    uint32_t suffix_bytes_length;
     uint32_t floor_data_length;
+    uint32_t stat_bytes_length;
+    uint32_t longs_length;
+    uint32_t bytes_length;
 
-    data_input_t* floor_data_reader;
     data_input_t* suffixes_reader;
+    data_input_t* floor_data_reader;
+    data_input_t* stats_reader;
+    data_input_t* bytes_reader;
 } segment_terms_enum_frame_t;
 
 struct _segment_term_enum_t {
@@ -86,7 +96,7 @@ struct _segment_term_enum_t {
     bool term_exists;
 };
 
-field_reader_t* field_reader_new(uint64_t index_start_fp, data_input_t* index_in);
+field_reader_t* field_reader_new(uint64_t index_start_fp, uint32_t longs_size, data_input_t* index_in);
 segment_terms_enum_t* segment_terms_enum_new(field_reader_t *field_reader);
 bool seek_exact(segment_terms_enum_t* terms_enum, bytes_ref_t* target);
 

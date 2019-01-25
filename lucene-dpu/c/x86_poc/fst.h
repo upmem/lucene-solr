@@ -30,6 +30,7 @@ typedef struct {
 } arc_t;
 
 typedef struct {
+    uint8_t* bytes_array;
     bytes_ref_t* empty_output;
     int64_t start_node;
     arc_t** cached_root_arcs;

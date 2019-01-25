@@ -39,10 +39,14 @@ static void next_frame_leaf(segment_terms_enum_frame_t* frame);
 static bool next_frame_non_leaf(segment_terms_enum_frame_t* frame);
 
 static segment_terms_enum_frame_t* segment_term_enum_frame_new(segment_terms_enum_t* term_enum, int32_t ord);
+static void segment_term_enum_frame_init(segment_terms_enum_frame_t* frame, segment_terms_enum_t* term_enum, int32_t ord);
 
-field_reader_t* field_reader_new(uint64_t index_start_fp, data_input_t* index_in) {
+static block_term_state_t* block_term_state_new(void);
+
+field_reader_t* field_reader_new(uint64_t index_start_fp, uint32_t longs_size, data_input_t* index_in) {
     field_reader_t* reader = allocation_get(sizeof(*reader));
 
+    reader->longs_size = longs_size;
     // todo other fields if needed
 
     if (index_in != NULL) {
@@ -217,13 +221,25 @@ bool seek_exact(segment_terms_enum_t* terms_enum, bytes_ref_t* target) {
 static segment_terms_enum_frame_t* segment_term_enum_frame_new(segment_terms_enum_t* term_enum, int32_t ord) {
     segment_terms_enum_frame_t* frame = allocation_get(sizeof(*frame));
 
-    frame->ste = term_enum;
-    frame->ord = ord;
-    // todo frame state
-    frame->state->total_term_freq = -1;
-    // todo frame longs
+    segment_term_enum_frame_init(frame, term_enum, ord);
 
     return frame;
+}
+
+static void segment_term_enum_frame_init(segment_terms_enum_frame_t* frame, segment_terms_enum_t* term_enum, int32_t ord) {
+    frame->ste = term_enum;
+    frame->ord = ord;
+    frame->state = block_term_state_new();
+    // todo frame state
+    frame->state->total_term_freq = -1;
+    frame->longs = allocation_get((term_enum->field_reader->longs_size) * sizeof(*(frame->longs)));
+    frame->longs_length = term_enum->field_reader->longs_size;
+
+    // todo initialize arrays?
+    frame->suffix_bytes_length = 0;
+    frame->stat_bytes_length = 0;
+    frame->floor_data_length = 0;
+    frame->bytes_length = 0;
 }
 
 static segment_terms_enum_frame_t* push_frame_bytes_ref(segment_terms_enum_t* terms_enum, arc_t* arc, bytes_ref_t* frame_data, uint32_t length) {
@@ -271,9 +287,14 @@ static segment_terms_enum_frame_t* push_frame_fp(segment_terms_enum_t* terms_enu
 
 static segment_terms_enum_frame_t* get_frame(segment_terms_enum_t* terms_enum, int32_t ord) {
     if (ord >= terms_enum->stack_length) {
-        // todo
-        printf("get_frame!\n");
-        exit(1);
+        segment_terms_enum_frame_t* next = allocation_get((ord + 1) * sizeof(*next));
+        memcpy(next, terms_enum->stack, ord * sizeof(*(terms_enum->stack)));
+        for (int stack_ord = terms_enum->stack_length; stack_ord < ord + 1; ++stack_ord) {
+            segment_term_enum_frame_init(next + stack_ord, terms_enum, stack_ord);
+        }
+
+        terms_enum->stack = next;
+        terms_enum->stack_length = (uint32_t) (ord + 1);
     }
 
     return terms_enum->stack + ord;
@@ -281,9 +302,13 @@ static segment_terms_enum_frame_t* get_frame(segment_terms_enum_t* terms_enum, i
 
 static arc_t* get_arc(segment_terms_enum_t* terms_enum, int32_t ord) {
     if (ord >= terms_enum->arcs_length) {
-        // todo
-        printf("get_arc!\n");
-        exit(1);
+        arc_t* next = allocation_get((ord + 1) * sizeof(*next));
+        memcpy(next, terms_enum->arcs, ord * sizeof(*(terms_enum->arcs)));
+
+        // todo new arcs init? find_target_arc should do it
+
+        terms_enum->arcs = next;
+        terms_enum->arcs_length = (uint32_t) (ord + 1);
     }
 
     return terms_enum->arcs + ord;
@@ -292,9 +317,8 @@ static arc_t* get_arc(segment_terms_enum_t* terms_enum, int32_t ord) {
 static void set_floor_data(segment_terms_enum_frame_t* frame, data_input_t* in, bytes_ref_t* source) {
     uint32_t num_bytes = source->length - (in->index - source->offset);
     if (num_bytes > frame->floor_data_length) {
-        // todo
-        printf("set_floor_data!\n");
-        exit(1);
+        frame->floor_data = allocation_get(num_bytes);
+        frame->floor_data_length = num_bytes;
     }
     memcpy(frame->floor_data, source->bytes + source->offset + in->index, num_bytes);
     frame->floor_data_reader->buffer = frame->floor_data;
@@ -555,4 +579,12 @@ static bool next_frame_non_leaf(segment_terms_enum_frame_t* frame) {
             return true;
         }
     }
+}
+
+static block_term_state_t* block_term_state_new(void) {
+    block_term_state_t* result = allocation_get(sizeof(*result));
+
+    // todo
+
+    return result;
 }
