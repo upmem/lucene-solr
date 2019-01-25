@@ -21,6 +21,7 @@ void read_bytes(struct _data_input_t* self, uint8_t* dest, uint32_t offset, uint
 uint16_t read_short(data_input_t* input);
 uint32_t read_int(data_input_t* input);
 uint32_t read_vint(data_input_t* input);
+uint64_t read_long(data_input_t* input);
 uint64_t read_vlong(data_input_t* input);
 char* read_string(data_input_t* input, uint32_t* length);
 

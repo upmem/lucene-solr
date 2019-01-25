@@ -38,6 +38,17 @@ uint32_t read_vint(data_input_t* input) {
     return i;
 }
 
+uint64_t read_long(data_input_t* input) {
+    return (uint64_t) (((  (uint64_t)(input->read_byte(input) & 0xFF)) << 56)
+                       | (((uint64_t)(input->read_byte(input) & 0xFF)) << 48)
+                       | (((uint64_t)(input->read_byte(input) & 0xFF)) << 40)
+                       | (((uint64_t)(input->read_byte(input) & 0xFF)) << 32)
+                       | (((uint64_t)(input->read_byte(input) & 0xFF)) << 24)
+                       | (((uint64_t)(input->read_byte(input) & 0xFF)) << 16)
+                       | (((uint64_t)(input->read_byte(input) & 0xFF)) << 8)
+                       | (((uint64_t) input->read_byte(input) & 0xFF)));
+}
+
 uint64_t read_vlong(data_input_t* input) {
     uint8_t b = input->read_byte(input);
     uint64_t i = (uint64_t) (b & 0x7F);
