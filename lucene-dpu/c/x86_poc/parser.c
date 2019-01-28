@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2014-2019 - uPmem
+ */
+
 #include "parser.h"
 #include "parser_si.h"
 #include "parser_cfe.h"
@@ -60,7 +64,7 @@ static FILE *file_open(char *path,
 static void generate_file_buffers_from_cfs(char *path,
                                            unsigned int segment_id,
                                            char *filename,
-                                           void **file_buffers,
+                                           file_buffer_t* file_buffers,
                                            lucene_si_file_t *si_file)
 {
     FILE *f_cfe, *f_cfs;
@@ -93,8 +97,9 @@ static void generate_file_buffers_from_cfs(char *path,
 
     for (each = 0; each < cfe_file->NumEntries; each++) {
         unsigned int file_buffers_id = extension_to_index(cfe_file->entries[each].entry_name);
-        file_buffers[file_buffers_id] = malloc(cfe_file->entries[each].length);
-        memcpy(file_buffers[file_buffers_id],
+        file_buffers[file_buffers_id].content = malloc(cfe_file->entries[each].length);
+        file_buffers[file_buffers_id].length = cfe_file->entries[each].length;
+        memcpy(file_buffers[file_buffers_id].content,
                &cfs_buffer[cfe_file->entries[each].offset],
                cfe_file->entries[each].length);
     }
@@ -103,12 +108,12 @@ static void generate_file_buffers_from_cfs(char *path,
     free_cfe_file(cfe_file);
 }
 
-void **get_file_buffers(char *path, unsigned int segment_id)
+file_buffer_t* get_file_buffers(char *path, unsigned int segment_id)
 {
     char filename[STRING_MAX_SIZE];
     FILE *f_si;
     lucene_si_file_t *si_file;
-    void **file_buffers = (void **)calloc(LUCENE_FILE_ENUM_LENGTH, sizeof(void **));
+    file_buffer_t* file_buffers = calloc(LUCENE_FILE_ENUM_LENGTH, sizeof(*file_buffers));
 
     sprintf(filename, "%s/_%u%s", path, segment_id, lucene_file_extension[LUCENE_FILE_SI]);
     f_si = fopen(filename, "r");
@@ -130,12 +135,12 @@ void **get_file_buffers(char *path, unsigned int segment_id)
     return file_buffers;
 }
 
-void free_file_buffers(void **file_buffers)
+void free_file_buffers(file_buffer_t* file_buffers)
 {
     unsigned int each;
     for (each = 0; each < LUCENE_FILE_ENUM_LENGTH; each++) {
-        if (file_buffers[each] != NULL) {
-            free(file_buffers[each]);
+        if (file_buffers[each].content != NULL) {
+            free(file_buffers[each].content);
         }
     }
     free(file_buffers);

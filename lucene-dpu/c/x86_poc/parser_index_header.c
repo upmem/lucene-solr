@@ -1,9 +1,14 @@
+/*
+ * Copyright (c) 2014-2019 - uPmem
+ */
+
 #include "parser_index_header.h"
 #include "allocation.h"
 #include "data_input.h"
 
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 lucene_index_header_t *read_index_header(data_input_t *buffer)
 {
@@ -54,4 +59,14 @@ void free_index_header(lucene_index_header_t *index_header)
     allocation_free(index_header->CodecName);
     allocation_free(index_header->SuffixBytes);
     allocation_free(index_header);
+}
+
+uint32_t check_header(data_input_t* in) {
+    // todo this function does not check anything, just read the expected bytes and returns the version
+    uint32_t actual_header = read_int(in);
+    uint32_t actual_codec_length;
+    char* actual_code = read_string(in, &actual_codec_length);
+    free(actual_code);
+    uint32_t actual_version = read_int(in);
+    return actual_version;
 }

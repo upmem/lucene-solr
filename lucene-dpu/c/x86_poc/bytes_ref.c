@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018 - uPmem
+ * Copyright (c) 2014-2019 - uPmem
  */
 
 #include <stddef.h>
@@ -15,6 +15,15 @@ const bytes_ref_t EMPTY_BYTES = {
         .length = 0,
         .capacity = 0,
 };
+
+bytes_ref_t* bytes_ref_new(void) {
+    bytes_ref_t* result = allocation_get(sizeof(*result));
+    result->bytes = (uint8_t *) EMPTY_ARRAY;
+    result->offset = 0;
+    result->length = 0;
+    result->capacity = 0;
+    return result;
+}
 
 bytes_ref_t* bytes_ref_add(bytes_ref_t* prefix, bytes_ref_t* output) {
     if (prefix == &EMPTY_BYTES) {

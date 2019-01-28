@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018 - uPmem
+ * Copyright (c) 2014-2019 - uPmem
  */
 
 #ifndef X86_POC_SEGMENT_TERMS_ENUM_H
@@ -9,17 +9,20 @@
 #include "bytes_ref.h"
 #include "data_input.h"
 #include "fst.h"
-
-typedef struct {
-    fst_t* index;
-    uint32_t longs_size;
-} field_reader_t;
+#include "block_tree_terms_reader.h"
 
 typedef struct {
     uint32_t doc_freq;
     int64_t total_term_freq;
     uint32_t term_block_ord;
     uint64_t block_file_pointer;
+
+    uint64_t doc_start_fp;
+    uint64_t pos_start_fp;
+    uint64_t pay_start_fp;
+    int32_t singleton_doc_id;
+    int64_t last_pos_block_offset;
+    int64_t skip_offset;
 } block_term_state_t;
 
 typedef struct _segment_term_enum_t segment_terms_enum_t;
@@ -45,6 +48,8 @@ typedef struct {
     bool is_leaf_block;
 
     int64_t last_sub_fp;
+
+    uint32_t metadata_up_to;
 
     block_term_state_t* state;
 
@@ -76,6 +81,8 @@ typedef struct {
 } segment_terms_enum_frame_t;
 
 struct _segment_term_enum_t {
+    data_input_t* in;
+
     segment_terms_enum_frame_t* static_frame;
     segment_terms_enum_frame_t* current_frame;
 
@@ -96,8 +103,10 @@ struct _segment_term_enum_t {
     bool term_exists;
 };
 
-field_reader_t* field_reader_new(uint64_t index_start_fp, uint32_t longs_size, data_input_t* index_in);
 segment_terms_enum_t* segment_terms_enum_new(field_reader_t *field_reader);
 bool seek_exact(segment_terms_enum_t* terms_enum, bytes_ref_t* target);
+block_term_state_t* get_term_state(segment_terms_enum_t* terms_enum);
+int32_t get_doc_freq(segment_terms_enum_t* terms_enum);
+int64_t get_total_term_freq(segment_terms_enum_t* terms_enum);
 
 #endif //X86_POC_SEGMENT_TERMS_ENUM_H

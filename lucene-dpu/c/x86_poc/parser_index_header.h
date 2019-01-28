@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2014-2019 - uPmem
+ */
+
 #ifndef __PARSER_INDEX_HEADER_H__
 #define __PARSER_INDEX_HEADER_H__
 
@@ -20,5 +24,7 @@ lucene_index_header_t *read_index_header(data_input_t *buffer);
 void print_index_header(lucene_index_header_t *index_header);
 
 void free_index_header(lucene_index_header_t *index_header);
+
+uint32_t check_header(data_input_t* in);
 
 #endif /* __PARSER_INDEX_HEADER_H__ */

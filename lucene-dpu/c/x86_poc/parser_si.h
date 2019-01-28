@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2014-2019 - uPmem
+ */
+
 #ifndef __PARSER_SI_H__
 #define __PARSER_SI_H__
 

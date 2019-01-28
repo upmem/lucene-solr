@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018 - uPmem
+ * Copyright (c) 2014-2019 - uPmem
  */
 
 #include <string.h>

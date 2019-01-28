@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018 - uPmem
+ * Copyright (c) 2014-2019 - uPmem
  */
 
 #include <stddef.h>
@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include "fst.h"
 #include "allocation.h"
+#include "parser_index_header.h"
 
 #define END_LABEL (-1)
 
@@ -45,7 +46,7 @@ static void cache_root_arcs(fst_t* fst);
 fst_t* fst_new(data_input_t* in) {
     fst_t* result = allocation_get(sizeof(*result));
 
-    // todo check header
+    check_header(in);
 
     if (in->read_byte(in) == 1) {
         int32_t num_bytes = read_vint(in);
@@ -59,7 +60,7 @@ fst_t* fst_new(data_input_t* in) {
 
             data_input_t reader = {
                     .buffer = empty_bytes,
-                    .index = 0,
+                    .index = (uint32_t) (num_bytes - 1),
                     .read_byte = decremental_read_byte,
                     .skip_bytes = decremental_skip_bytes
             };
@@ -89,6 +90,7 @@ fst_t* fst_new(data_input_t* in) {
     int64_t num_bytes = read_vlong(in);
 
     result->bytes_array = allocation_get((size_t) num_bytes);
+    result->bytes_array_length = (uint32_t) num_bytes;
     read_bytes(in, result->bytes_array, 0, (uint32_t) num_bytes);
 
     cache_root_arcs(result);
@@ -121,7 +123,10 @@ arc_t* find_target_arc(fst_t* fst, int32_t label_to_match, arc_t* follow, arc_t*
 }
 
 static void cache_root_arcs(fst_t* fst) {
-    // todo
+    // todo: currently caching is disabled
+
+    fst->cached_root_arcs = NULL;
+    fst->cached_root_arcs_length = 0;
 }
 
 static inline arc_t* _find_target_arc(fst_t* fst, int32_t label_to_match, arc_t* follow, arc_t* arc, data_input_t* in, bool use_root_arc_cache) {
@@ -360,7 +365,7 @@ data_input_t* fst_get_bytes_reader(fst_t* fst) {
     data_input_t* result = allocation_get(sizeof(*result));
 
     result->buffer = fst->bytes_array;
-    result->index = 0;
+    result->index = fst->bytes_array_length - 1;
     result->read_byte = decremental_read_byte;
     result->skip_bytes = decremental_skip_bytes;
 

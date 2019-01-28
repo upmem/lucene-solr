@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018 - uPmem
+ * Copyright (c) 2014-2019 - uPmem
  */
 
 #include <stddef.h>
@@ -13,6 +13,8 @@
 #define OUTPUT_FLAGS_NUM_BITS 2
 #define OUTPUT_FLAG_IS_FLOOR 0x2
 #define OUTPUT_FLAG_HAS_TERMS 0x2
+
+#define BLOCK_SIZE 128
 
 typedef enum {
     SEEK_STATUS_END,
@@ -41,27 +43,15 @@ static bool next_frame_non_leaf(segment_terms_enum_frame_t* frame);
 static segment_terms_enum_frame_t* segment_term_enum_frame_new(segment_terms_enum_t* term_enum, int32_t ord);
 static void segment_term_enum_frame_init(segment_terms_enum_frame_t* frame, segment_terms_enum_t* term_enum, int32_t ord);
 
+static void init_index_input(segment_terms_enum_t* terms_enum);
+
 static block_term_state_t* block_term_state_new(void);
-
-field_reader_t* field_reader_new(uint64_t index_start_fp, uint32_t longs_size, data_input_t* index_in) {
-    field_reader_t* reader = allocation_get(sizeof(*reader));
-
-    reader->longs_size = longs_size;
-    // todo other fields if needed
-
-    if (index_in != NULL) {
-        data_input_t* clone = data_input_clone(index_in);
-        clone->index = (uint32_t) index_start_fp;
-        reader->index = fst_new(clone);
-    } else {
-        reader->index = NULL;
-    }
-
-    return reader;
-}
+static void decode_metadata(segment_terms_enum_frame_t* frame);
+static void decode_term(int64_t* longs, data_input_t* in, block_term_state_t* state, bool absolute);
 
 segment_terms_enum_t* segment_terms_enum_new(field_reader_t *field_reader) {
     segment_terms_enum_t* terms_enum = allocation_get(sizeof(*terms_enum));
+    terms_enum->in = NULL;
     terms_enum->field_reader = field_reader;
     terms_enum->stack = NULL;
     terms_enum->stack_length = 0;
@@ -80,8 +70,26 @@ segment_terms_enum_t* segment_terms_enum_new(field_reader_t *field_reader) {
     terms_enum->current_frame = terms_enum->static_frame;
 
     terms_enum->valid_index_prefix = 0;
+    terms_enum->term = bytes_ref_new();
 
     return terms_enum;
+}
+
+block_term_state_t* get_term_state(segment_terms_enum_t* terms_enum) {
+    decode_metadata(terms_enum->current_frame);
+    block_term_state_t* result = allocation_get(sizeof(*result));
+    memcpy(result, terms_enum->current_frame->state, sizeof(*result));
+    return result;
+}
+
+int32_t get_doc_freq(segment_terms_enum_t* terms_enum) {
+    decode_metadata(terms_enum->current_frame);
+    return terms_enum->current_frame->state->doc_freq;
+}
+
+int64_t get_total_term_freq(segment_terms_enum_t* terms_enum) {
+    decode_metadata(terms_enum->current_frame);
+    return terms_enum->current_frame->state->total_term_freq;
 }
 
 bool seek_exact(segment_terms_enum_t* terms_enum, bytes_ref_t* target) {
@@ -89,6 +97,7 @@ bool seek_exact(segment_terms_enum_t* terms_enum, bytes_ref_t* target) {
     bytes_ref_t* output;
     uint32_t target_up_to;
 
+    bytes_ref_grow(terms_enum->term, 1 + target->length);
     terms_enum->target_before_current_length = terms_enum->current_frame->ord;
 
     if (terms_enum->current_frame != terms_enum->static_frame) {
@@ -230,16 +239,30 @@ static void segment_term_enum_frame_init(segment_terms_enum_frame_t* frame, segm
     frame->ste = term_enum;
     frame->ord = ord;
     frame->state = block_term_state_new();
-    // todo frame state
     frame->state->total_term_freq = -1;
     frame->longs = allocation_get((term_enum->field_reader->longs_size) * sizeof(*(frame->longs)));
     frame->longs_length = term_enum->field_reader->longs_size;
 
-    // todo initialize arrays?
     frame->suffix_bytes_length = 0;
     frame->stat_bytes_length = 0;
     frame->floor_data_length = 0;
     frame->bytes_length = 0;
+
+    frame->suffixes_reader = allocation_get(sizeof(*(frame->suffixes_reader)));
+    frame->suffixes_reader->read_byte = incremental_read_byte;
+    frame->suffixes_reader->skip_bytes = incremental_skip_bytes;
+
+    frame->floor_data_reader = allocation_get(sizeof(*(frame->floor_data_reader)));
+    frame->floor_data_reader->read_byte = incremental_read_byte;
+    frame->floor_data_reader->skip_bytes = incremental_skip_bytes;
+
+    frame->stats_reader = allocation_get(sizeof(*(frame->stats_reader)));
+    frame->stats_reader->read_byte = incremental_read_byte;
+    frame->stats_reader->skip_bytes = incremental_skip_bytes;
+
+    frame->bytes_reader = allocation_get(sizeof(*(frame->bytes_reader)));
+    frame->bytes_reader->read_byte = incremental_read_byte;
+    frame->bytes_reader->skip_bytes = incremental_skip_bytes;
 }
 
 static segment_terms_enum_frame_t* push_frame_bytes_ref(segment_terms_enum_t* terms_enum, arc_t* arc, bytes_ref_t* frame_data, uint32_t length) {
@@ -382,9 +405,50 @@ static void load_next_floor_block(segment_terms_enum_frame_t* frame) {
 }
 
 static void load_block(segment_terms_enum_frame_t* frame) {
-    // todo
-    printf("load_block!\n");
-    exit(1);
+    init_index_input(frame->ste);
+
+    if (frame->next_ent != -1) {
+        return;
+    }
+
+    frame->ste->in->index = (uint32_t) frame->fp;
+    uint32_t code = read_vint(frame->ste->in);
+    frame->ent_count = code >> 1;
+    frame->is_last_in_floor = (code & 1) != 0;
+    code = read_vint(frame->ste->in);
+    frame->is_leaf_block = (code & 1) != 0;
+    uint32_t num_bytes = code >> 1;
+    if (frame->suffix_bytes_length < num_bytes) {
+        frame->suffix_bytes = allocation_get(num_bytes);
+        frame->suffix_bytes_length = num_bytes;
+    }
+    read_bytes(frame->ste->in, frame->suffix_bytes, 0, num_bytes);
+    frame->suffixes_reader->index = 0;
+    frame->suffixes_reader->buffer = frame->suffix_bytes;
+
+    num_bytes = read_vint(frame->ste->in);
+    if (frame->stat_bytes_length < num_bytes) {
+        frame->stat_bytes = allocation_get(num_bytes);
+        frame->stat_bytes_length = num_bytes;
+    }
+    read_bytes(frame->ste->in, frame->stat_bytes, 0, num_bytes);
+    frame->stats_reader->index = 0;
+    frame->stats_reader->buffer = frame->stat_bytes;
+    frame->metadata_up_to = 0;
+    frame->state->term_block_ord = 0;
+    frame->next_ent = 0;
+    frame->last_sub_fp = -1;
+
+    num_bytes = read_vint(frame->ste->in);
+    if (frame->bytes_length < num_bytes) {
+        frame->bytes = allocation_get(num_bytes);
+        frame->bytes_length = num_bytes;
+    }
+    read_bytes(frame->ste->in, frame->bytes, 0, num_bytes);
+    frame->bytes_reader->index = 0;
+    frame->bytes_reader->buffer = frame->bytes;
+
+    frame->fp_end = frame->ste->in->index;
 }
 
 static seek_status_t scan_to_term(segment_terms_enum_frame_t* frame, bytes_ref_t* target, bool exact_only) {
@@ -587,4 +651,66 @@ static block_term_state_t* block_term_state_new(void) {
     // todo
 
     return result;
+}
+
+static void init_index_input(segment_terms_enum_t* terms_enum) {
+    if (terms_enum->in == NULL) {
+        terms_enum->in = data_input_clone(terms_enum->field_reader->parent->terms_in);
+    }
+}
+
+static void decode_metadata(segment_terms_enum_frame_t* frame) {
+    int32_t limit = frame->is_leaf_block ? frame->next_ent : frame->state->term_block_ord;
+    bool absolute = frame->metadata_up_to == 0;
+
+    while (frame->metadata_up_to < limit) {
+        frame->state->doc_freq = read_vint(frame->stats_reader);
+        // todo totalTermFreq is omitted, if fieldInfo.getIndexOptions() == IndexOptions.DOCS
+        frame->state->total_term_freq = frame->state->doc_freq + read_vlong(frame->stats_reader);
+        for (int i = 0; i < frame->ste->field_reader->longs_size; ++i) {
+            frame->longs[i] = read_vlong(frame->bytes_reader);
+        }
+        decode_term(frame->longs, frame->bytes_reader, frame->state, absolute);
+        frame->metadata_up_to++;
+        absolute = false;
+    }
+    frame->state->term_block_ord = frame->metadata_up_to;
+}
+
+static void decode_term(int64_t* longs, data_input_t* in, block_term_state_t* state, bool absolute) {
+    // todo the next 3 booleans depend on the field_info
+    bool field_has_positions = true;
+    bool field_has_offsets = false;
+    bool field_has_payloads = false;
+
+    if (absolute) {
+        state->doc_start_fp = 0;
+        state->pos_start_fp = 0;
+        state->pay_start_fp = 0;
+    }
+
+    state->doc_start_fp += longs[0];
+    if (field_has_positions) {
+        state->pos_start_fp += longs[1];
+        if (field_has_offsets || field_has_payloads) {
+            state->pay_start_fp += longs[2];
+        }
+    }
+    if (state->doc_freq == 1) {
+        state->singleton_doc_id = read_vint(in);
+    } else {
+        state->singleton_doc_id = -1;
+    }
+    if (field_has_positions) {
+        if (state->total_term_freq > BLOCK_SIZE) {
+            state->last_pos_block_offset = read_vlong(in);
+        } else {
+            state->last_pos_block_offset = -1;
+        }
+    }
+    if (state->doc_freq > BLOCK_SIZE) {
+        state->skip_offset = read_vlong(in);
+    } else {
+        state->skip_offset = -1;
+    }
 }

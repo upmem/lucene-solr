@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2014-2019 - uPmem
+ */
+
 #include "parser_codec_footer.h"
 #include "allocation.h"
 #include "data_input.h"

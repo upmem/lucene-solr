@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018 - uPmem
+ * Copyright (c) 2014-2019 - uPmem
  */
 
 #ifndef X86_POC_FST_H
@@ -31,6 +31,7 @@ typedef struct {
 
 typedef struct {
     uint8_t* bytes_array;
+    uint32_t bytes_array_length;
     bytes_ref_t* empty_output;
     int64_t start_node;
     arc_t** cached_root_arcs;

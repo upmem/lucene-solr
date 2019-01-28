@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2014-2019 - uPmem
+ */
+
 #include "parser_si.h"
 #include "parser_index_header.h"
 #include "parser_codec_footer.h"

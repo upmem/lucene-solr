@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2014-2019 - uPmem
+ */
+
 #ifndef __PARSER_CFE_H__
 #define __PARSER_CFE_H__
 

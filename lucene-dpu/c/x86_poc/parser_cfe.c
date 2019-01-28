@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2014-2019 - uPmem
+ */
+
 #include "parser_cfe.h"
 #include "allocation.h"
 #include "data_input.h"

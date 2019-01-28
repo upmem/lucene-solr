@@ -1,5 +1,11 @@
+/*
+ * Copyright (c) 2014-2019 - uPmem
+ */
+
 #ifndef __PARSER_H__
 #define __PARSER_H__
+
+#include <stdint.h>
 
 typedef enum {
               LUCENE_FILE_SI,
@@ -25,8 +31,13 @@ typedef enum {
               LUCENE_FILE_ENUM_LENGTH,
 } lucene_file_e;
 
-void **get_file_buffers(char *path, unsigned int segment_id);
+typedef struct {
+    uint64_t length;
+    uint8_t* content;
+} file_buffer_t;
 
-void free_file_buffers(void **file_buffers);
+file_buffer_t* get_file_buffers(char *path, unsigned int segment_id);
+
+void free_file_buffers(file_buffer_t* file_buffers);
 
 #endif /* __PARSER_H__ */
