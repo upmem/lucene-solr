@@ -47,7 +47,7 @@ static void init_index_input(segment_terms_enum_t* terms_enum);
 
 static block_term_state_t* block_term_state_new(void);
 static void decode_metadata(segment_terms_enum_frame_t* frame);
-static void decode_term(int64_t* longs, data_input_t* in, block_term_state_t* state, bool absolute);
+static void decode_term(int64_t* longs, data_input_t* in, field_info_t* field_info, block_term_state_t* state, bool absolute);
 
 segment_terms_enum_t* segment_terms_enum_new(field_reader_t *field_reader) {
     segment_terms_enum_t* terms_enum = allocation_get(sizeof(*terms_enum));
@@ -648,7 +648,8 @@ static bool next_frame_non_leaf(segment_terms_enum_frame_t* frame) {
 static block_term_state_t* block_term_state_new(void) {
     block_term_state_t* result = allocation_get(sizeof(*result));
 
-    // todo
+    result->last_pos_block_offset = -1;
+    result->singleton_doc_id = -1;
 
     return result;
 }
@@ -665,23 +666,25 @@ static void decode_metadata(segment_terms_enum_frame_t* frame) {
 
     while (frame->metadata_up_to < limit) {
         frame->state->doc_freq = read_vint(frame->stats_reader);
-        // todo totalTermFreq is omitted, if fieldInfo.getIndexOptions() == IndexOptions.DOCS
-        frame->state->total_term_freq = frame->state->doc_freq + read_vlong(frame->stats_reader);
+        if (frame->ste->field_reader->field_info->index_options == INDEX_OPTIONS_DOCS) {
+            frame->state->total_term_freq = frame->state->doc_freq;
+        } else {
+            frame->state->total_term_freq = frame->state->doc_freq + read_vlong(frame->stats_reader);
+        }
         for (int i = 0; i < frame->ste->field_reader->longs_size; ++i) {
             frame->longs[i] = read_vlong(frame->bytes_reader);
         }
-        decode_term(frame->longs, frame->bytes_reader, frame->state, absolute);
+        decode_term(frame->longs, frame->bytes_reader, frame->ste->field_reader->field_info, frame->state, absolute);
         frame->metadata_up_to++;
         absolute = false;
     }
     frame->state->term_block_ord = frame->metadata_up_to;
 }
 
-static void decode_term(int64_t* longs, data_input_t* in, block_term_state_t* state, bool absolute) {
-    // todo the next 3 booleans depend on the field_info
-    bool field_has_positions = true;
-    bool field_has_offsets = false;
-    bool field_has_payloads = false;
+static void decode_term(int64_t* longs, data_input_t* in, field_info_t* field_info, block_term_state_t* state, bool absolute) {
+    bool field_has_positions = (field_info->index_options - INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
+    bool field_has_offsets = (field_info->index_options - INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0;
+    bool field_has_payloads = field_info->store_payloads;
 
     if (absolute) {
         state->doc_start_fp = 0;

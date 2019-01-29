@@ -6,12 +6,17 @@
 #include <stdio.h>
 #include "parser.h"
 #include "segment_terms_enum.h"
+#include "field_infos.h"
 
 int main(int argc, char **argv)
 {
     file_buffer_t* file_buffers;
 
     file_buffers = get_file_buffers(argv[1], 0);
+
+    file_buffer_t* field_infos_buffer = file_buffers + LUCENE_FILE_FNM;
+
+    field_infos_t* field_infos = read_field_infos(field_infos_buffer);
 
     file_buffer_t* terms_dict = file_buffers + LUCENE_FILE_TIM;
     file_buffer_t* terms_index = file_buffers + LUCENE_FILE_TIP;
@@ -30,10 +35,10 @@ int main(int argc, char **argv)
             .skip_bytes = incremental_skip_bytes
     };
 
-    block_tree_term_reader_t* reader = block_tree_term_reader_new(&terms_in, (uint32_t) terms_dict->length, &index_in,
-                                                                 (uint32_t) terms_index->length);
+    block_tree_term_reader_t* reader = block_tree_term_reader_new(field_infos, &terms_in, (uint32_t) terms_dict->length,
+            &index_in, (uint32_t) terms_index->length);
 
-    char* query = "apache";
+    char* query = "patent";
 
     uint32_t term_field = 2;
     bytes_ref_t term_bytes = {

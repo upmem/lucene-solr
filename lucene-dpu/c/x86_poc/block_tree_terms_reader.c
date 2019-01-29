@@ -26,12 +26,14 @@ typedef struct {
 } fields_details_t;
 
 static void seek_dir(data_input_t* in, uint32_t in_length);
-static fields_details_t* parse_fields_details(data_input_t* terms_in, uint32_t terms_in_length);
+static fields_details_t* parse_fields_details(field_infos_t* field_infos, data_input_t* terms_in, uint32_t terms_in_length);
 static bytes_ref_t* read_bytes_ref(data_input_t* terms_in);
+static field_reader_t* field_reader_new(block_tree_term_reader_t* parent, field_info_t* field_info, uint64_t index_start_fp, uint32_t longs_size, data_input_t* index_in);
 
-field_reader_t* field_reader_new(block_tree_term_reader_t* parent, uint64_t index_start_fp, uint32_t longs_size, data_input_t* index_in) {
+static field_reader_t* field_reader_new(block_tree_term_reader_t* parent, field_info_t* field_info, uint64_t index_start_fp, uint32_t longs_size, data_input_t* index_in) {
     field_reader_t* reader = allocation_get(sizeof(*reader));
 
+    reader->field_info = field_info;
     reader->longs_size = longs_size;
     reader->parent = parent;
     // todo other fields if needed
@@ -47,10 +49,11 @@ field_reader_t* field_reader_new(block_tree_term_reader_t* parent, uint64_t inde
     return reader;
 }
 
-block_tree_term_reader_t* block_tree_term_reader_new(data_input_t* terms_in, uint32_t terms_in_length, data_input_t* input_in, uint32_t input_in_length) {
+block_tree_term_reader_t* block_tree_term_reader_new(field_infos_t* field_infos,
+        data_input_t* terms_in, uint32_t terms_in_length, data_input_t* input_in, uint32_t input_in_length) {
     // todo: Lucene parses both files at the same time
 
-    fields_details_t* details = parse_fields_details(terms_in, terms_in_length);
+    fields_details_t* details = parse_fields_details(field_infos, terms_in, terms_in_length);
 
     seek_dir(input_in, input_in_length);
 
@@ -64,9 +67,10 @@ block_tree_term_reader_t* block_tree_term_reader_new(data_input_t* terms_in, uin
         block_tree_term_reader_field_t* field = reader->fields + i;
 
         uint64_t index_start_fp = read_vlong(input_in);
+        field_info_t* field_info = field_infos->by_number[field_detail->field];
 
         field->name = field_detail->field;
-        field->field_reader = field_reader_new(reader, index_start_fp, field_detail->longs_size, input_in);
+        field->field_reader = field_reader_new(reader, field_info, index_start_fp, field_detail->longs_size, input_in);
     }
 
     return reader;
@@ -84,7 +88,7 @@ field_reader_t* get_terms(block_tree_term_reader_t* reader, uint32_t field) {
     return NULL;
 }
 
-static fields_details_t* parse_fields_details(data_input_t* terms_in, uint32_t terms_in_length) {
+static fields_details_t* parse_fields_details(field_infos_t* field_infos, data_input_t* terms_in, uint32_t terms_in_length) {
     fields_details_t* result = allocation_get(sizeof(*result));
 
     // todo check header
@@ -100,9 +104,11 @@ static fields_details_t* parse_fields_details(data_input_t* terms_in, uint32_t t
         field->field = read_vint(terms_in);
         field->num_terms = read_vlong(terms_in);
         field->root_code = read_bytes_ref(terms_in);
-        field->sum_total_term_freq =read_vlong(terms_in);
-        // todo sum_doc_freq is omitted, if fieldInfo.getIndexOptions() == IndexOptions.DOCS
-        field->sum_doc_freq =read_vlong(terms_in);
+
+        field_info_t* field_info = field_infos->by_number[field->field];
+
+        field->sum_total_term_freq = read_vlong(terms_in);
+        field->sum_doc_freq = (field_info->index_options == INDEX_OPTIONS_DOCS) ? field->sum_total_term_freq : read_vlong(terms_in);
         field->doc_count = read_vint(terms_in);
         field->longs_size = read_vint(terms_in);
         field->min_term = read_bytes_ref(terms_in);

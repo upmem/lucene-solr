@@ -15,6 +15,16 @@ typedef struct _data_input_t {
     void (*skip_bytes)(struct _data_input_t* self, uint32_t length);
 } data_input_t;
 
+typedef struct {
+    char* key;
+    char* value;
+} string_map_entry_t;
+
+typedef struct {
+    uint32_t nr_entries;
+    string_map_entry_t* entries;
+} string_map_t;
+
 data_input_t* data_input_clone(data_input_t* from);
 
 void read_bytes(struct _data_input_t* self, uint8_t* dest, uint32_t offset, uint32_t length);
@@ -29,5 +39,7 @@ uint8_t incremental_read_byte(data_input_t* input);
 void incremental_skip_bytes(data_input_t* input, uint32_t length);
 uint8_t decremental_read_byte(data_input_t* input);
 void decremental_skip_bytes(data_input_t* input, uint32_t length);
+
+string_map_t* read_map_of_strings(data_input_t* input);
 
 #endif //X86_POC_UTILS_H

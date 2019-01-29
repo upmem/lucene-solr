@@ -61,6 +61,14 @@ void free_index_header(lucene_index_header_t *index_header)
     allocation_free(index_header);
 }
 
+uint32_t check_index_header(data_input_t* in) {
+    // todo this function does not check anything, just read the expected bytes and returns the version
+    lucene_index_header_t* header = read_index_header(in);
+    uint32_t version = header->Version;
+    free_index_header(header);
+    return version;
+}
+
 uint32_t check_header(data_input_t* in) {
     // todo this function does not check anything, just read the expected bytes and returns the version
     uint32_t actual_header = read_int(in);

@@ -7,10 +7,12 @@
 
 #include "data_input.h"
 #include "fst.h"
+#include "field_infos.h"
 
 typedef struct _block_tree_term_reader_t block_tree_term_reader_t;
 
 typedef struct {
+    field_info_t* field_info;
     fst_t* index;
     uint32_t longs_size;
     block_tree_term_reader_t* parent;
@@ -27,9 +29,7 @@ struct _block_tree_term_reader_t {
     data_input_t* terms_in;
 };
 
-
-field_reader_t* field_reader_new(block_tree_term_reader_t* parent, uint64_t index_start_fp, uint32_t longs_size, data_input_t* index_in);
-block_tree_term_reader_t* block_tree_term_reader_new(data_input_t* terms_in, uint32_t terms_in_length, data_input_t* input_in, uint32_t input_in_length);
+block_tree_term_reader_t* block_tree_term_reader_new(field_infos_t* field_infos, data_input_t* terms_in, uint32_t terms_in_length, data_input_t* input_in, uint32_t input_in_length);
 field_reader_t* get_terms(block_tree_term_reader_t* reader, uint32_t field);
 
 #endif //X86_POC_BLOCK_TREE_TERMS_READER_H
