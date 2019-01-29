@@ -11,7 +11,7 @@
 #include "allocation.h"
 
 #define OUTPUT_FLAGS_NUM_BITS 2
-#define OUTPUT_FLAG_IS_FLOOR 0x2
+#define OUTPUT_FLAG_IS_FLOOR 0x1
 #define OUTPUT_FLAG_HAS_TERMS 0x2
 
 #define BLOCK_SIZE 128
@@ -682,8 +682,8 @@ static void decode_metadata(segment_terms_enum_frame_t* frame) {
 }
 
 static void decode_term(int64_t* longs, data_input_t* in, field_info_t* field_info, block_term_state_t* state, bool absolute) {
-    bool field_has_positions = (field_info->index_options - INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
-    bool field_has_offsets = (field_info->index_options - INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0;
+    bool field_has_positions = compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
+    bool field_has_offsets = compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0;
     bool field_has_payloads = field_info->store_payloads;
 
     if (absolute) {

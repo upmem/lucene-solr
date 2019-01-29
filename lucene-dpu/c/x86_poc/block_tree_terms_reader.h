@@ -19,7 +19,7 @@ typedef struct {
 } field_reader_t;
 
 typedef struct {
-    uint32_t name;
+    char* name;
     field_reader_t* field_reader;
 } block_tree_term_reader_field_t;
 
@@ -30,6 +30,6 @@ struct _block_tree_term_reader_t {
 };
 
 block_tree_term_reader_t* block_tree_term_reader_new(field_infos_t* field_infos, data_input_t* terms_in, uint32_t terms_in_length, data_input_t* input_in, uint32_t input_in_length);
-field_reader_t* get_terms(block_tree_term_reader_t* reader, uint32_t field);
+field_reader_t* get_terms(block_tree_term_reader_t* reader, const char* field);
 
 #endif //X86_POC_BLOCK_TREE_TERMS_READER_H

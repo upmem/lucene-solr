@@ -69,18 +69,17 @@ block_tree_term_reader_t* block_tree_term_reader_new(field_infos_t* field_infos,
         uint64_t index_start_fp = read_vlong(input_in);
         field_info_t* field_info = field_infos->by_number[field_detail->field];
 
-        field->name = field_detail->field;
+        field->name = field_info->name;
         field->field_reader = field_reader_new(reader, field_info, index_start_fp, field_detail->longs_size, input_in);
     }
 
     return reader;
 }
 
-field_reader_t* get_terms(block_tree_term_reader_t* reader, uint32_t field) {
-    // todo: this is not the structure used in Lucene (we are using the field id where they are using the field name)
+field_reader_t* get_terms(block_tree_term_reader_t* reader, const char* field) {
     for (int i = 0; i < reader->nr_fields; ++i) {
         block_tree_term_reader_field_t* reader_field = reader->fields + i;
-        if (reader_field->name == field) {
+        if (strcmp(reader_field->name, field) == 0) {
             return reader_field->field_reader;
         }
     }

@@ -17,6 +17,7 @@ typedef struct {
 extern const bytes_ref_t EMPTY_BYTES;
 
 bytes_ref_t* bytes_ref_new(void);
+bytes_ref_t* bytes_ref_from_string(char* string);
 bytes_ref_t* bytes_ref_add(bytes_ref_t* prefix, bytes_ref_t* output);
 void bytes_ref_grow(bytes_ref_t* bytes_ref, uint32_t capacity);
 

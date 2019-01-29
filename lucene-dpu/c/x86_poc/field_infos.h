@@ -58,6 +58,7 @@ typedef struct {
     uint32_t by_number_length;
 } field_infos_t;
 
+int32_t compare_index_options(index_options_t first, index_options_t second);
 field_infos_t* read_field_infos(file_buffer_t* file);
 
 #endif //X86_POC_FIELD_INFOS_H

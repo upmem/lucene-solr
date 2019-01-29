@@ -7,6 +7,7 @@
 #include "parser.h"
 #include "segment_terms_enum.h"
 #include "field_infos.h"
+#include "term.h"
 
 int main(int argc, char **argv)
 {
@@ -38,27 +39,19 @@ int main(int argc, char **argv)
     block_tree_term_reader_t* reader = block_tree_term_reader_new(field_infos, &terms_in, (uint32_t) terms_dict->length,
             &index_in, (uint32_t) terms_index->length);
 
-    char* query = "patent";
+    term_t* term = term_from_string("contents", "apache");
 
-    uint32_t term_field = 2;
-    bytes_ref_t term_bytes = {
-            .bytes = (uint8_t *) query,
-            .length = (uint32_t) strlen(query),
-            .capacity = (uint32_t) strlen(query),
-            .offset = 0
-    };
-
-    field_reader_t* terms = get_terms(reader, term_field);
+    field_reader_t* terms = get_terms(reader, term->field);
     segment_terms_enum_t* terms_enum = segment_terms_enum_new(terms);
-    bool result = seek_exact(terms_enum, &term_bytes);
+    bool result = seek_exact(terms_enum, term->bytes);
 
     if (result) {
         block_term_state_t* term_state = get_term_state(terms_enum);
         int32_t doc_freq = get_doc_freq(terms_enum);
         int64_t total_term_freq = get_total_term_freq(terms_enum);
-        printf("MATCH for '%s' (doc_freq=%d, total_term_freq=%ld)\n", query, doc_freq, total_term_freq);
+        printf("MATCH for '%s' (doc_freq=%d, total_term_freq=%ld)\n", term->bytes->bytes, doc_freq, total_term_freq);
     } else {
-        printf("NO MATCH for '%s'\n", query);
+        printf("NO MATCH for '%s'\n", term->bytes->bytes);
     }
 
     free_file_buffers(file_buffers);

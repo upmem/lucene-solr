@@ -25,6 +25,18 @@ bytes_ref_t* bytes_ref_new(void) {
     return result;
 }
 
+bytes_ref_t* bytes_ref_from_string(char* string) {
+    bytes_ref_t* result = allocation_get(sizeof(*result));
+    uint32_t length = (uint32_t) strlen(string);
+
+    result->bytes = (uint8_t *) string;
+    result->length = length;
+    result->capacity = length;
+    result->offset = 0;
+
+    return result;
+}
+
 bytes_ref_t* bytes_ref_add(bytes_ref_t* prefix, bytes_ref_t* output) {
     if (prefix == &EMPTY_BYTES) {
         return output;

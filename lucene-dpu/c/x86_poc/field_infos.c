@@ -38,6 +38,10 @@ static void fill_field_info(field_info_t *info,
                             int32_t point_num_bytes,
                             bool soft_deletes_field);
 
+int32_t compare_index_options(index_options_t first, index_options_t second) {
+    return ((int32_t) first) - ((int32_t) second);
+}
+
 field_infos_t *read_field_infos(file_buffer_t *file) {
     data_input_t _input = {
             .buffer = file->content,
@@ -114,9 +118,9 @@ static field_infos_t *field_infos_new(field_info_t *infos, uint32_t infos_length
         field_info_t* info = infos + i;
 
         result->has_vectors |= info->store_term_vector;
-        result->has_prox |= (info->index_options - INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
+        result->has_prox |= compare_index_options(info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
         result->has_freq |= info->index_options != INDEX_OPTIONS_DOCS;
-        result->has_offsets |= (info->index_options - INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0;
+        result->has_offsets |= compare_index_options(info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0;
         result->has_norms |= (info->index_options != INDEX_OPTIONS_NONE) && !info->omit_norms;
         result->has_doc_values |= info->doc_values_type != DOC_VALUES_TYPE_NONE;
         result->has_payloads |= info->store_payloads;
