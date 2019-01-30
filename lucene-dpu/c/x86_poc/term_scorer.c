@@ -21,10 +21,10 @@ static inline bool needs_scores(score_mode_t score_mode) {
     }
 }
 
-term_weight_t* build_weight(query_t* query, score_mode_t score_mode, float boost, block_term_state_t* term_state) {
+term_weight_t* build_weight(term_t* term, score_mode_t score_mode, float boost, block_term_state_t* term_state) {
     term_weight_t* result = allocation_get(sizeof(*result));
 
-    result->query = query;
+    result->term = term;
     result->score_mode = score_mode;
     result->term_state = term_state;
 
@@ -42,7 +42,7 @@ term_scorer_t* build_scorer(term_weight_t* weight, segment_terms_enum_t* terms_e
 
     // todo in Lucene, terms_enum is fetched from the state, and seeks the term (again, in the simple case)
 
-    leaf_sim_scorer_t* scorer = leaf_sim_scorer_new(weight->sim_scorer, weight->query->term->field, needs_scores(weight->score_mode));
+    leaf_sim_scorer_t* scorer = leaf_sim_scorer_new(weight->sim_scorer, weight->term->field, needs_scores(weight->score_mode));
 
     if (weight->score_mode == SCORE_MODE_TOP_SCORES) {
         return term_scorer_new(weight, impacts(terms_enum, POSTINGS_ENUM_FREQS, doc_in, for_util), scorer);

@@ -18,10 +18,6 @@ typedef struct {
     // todo norms
 } leaf_sim_scorer_t;
 
-typedef struct {
-    term_t* term;
-} query_t;
-
 typedef enum {
     SCORE_MODE_COMPLETE,
     SCORE_MODE_COMPLETE_NO_SCORES,
@@ -29,7 +25,7 @@ typedef enum {
 } score_mode_t;
 
 typedef struct {
-    query_t* query;
+    term_t* term;
     // todo similarity
     sim_scorer_t* sim_scorer;
     block_term_state_t* term_state; // todo this is a TermStates in Lucene
@@ -45,7 +41,7 @@ typedef struct {
     // todo impactsDisi
 } term_scorer_t;
 
-term_weight_t* build_weight(query_t* query, score_mode_t score_mode, float boost, block_term_state_t* term_state);
+term_weight_t* build_weight(term_t* term, score_mode_t score_mode, float boost, block_term_state_t* term_state);
 term_scorer_t* build_scorer(term_weight_t* weight, segment_terms_enum_t* terms_enum, data_input_t* doc_in, for_util_t* for_util);
 
 #endif //X86_POC_TERM_SCORER_H

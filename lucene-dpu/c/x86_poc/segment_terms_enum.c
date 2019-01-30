@@ -64,7 +64,10 @@ static void decode(packed_int_decoder_t* decoder, uint8_t* blocks, uint32_t bloc
 
 static uint32_t MAX_DATA_SIZE = 0xFFFFFFFF;
 
-static void initialize_max_data_size();
+static void initialize_max_data_size(for_util_t* for_util);
+static uint32_t encoded_size(uint32_t bits_per_value);
+static void fill_decoder(packed_int_decoder_t* decoder, uint32_t bits_per_value);
+static uint32_t compute_iterations(packed_int_decoder_t* decoder);
 
 segment_terms_enum_t* segment_terms_enum_new(field_reader_t *field_reader) {
     segment_terms_enum_t* terms_enum = allocation_get(sizeof(*terms_enum));
@@ -759,7 +762,7 @@ postings_enum_t* impacts(segment_terms_enum_t* terms_enum, uint32_t flags, data_
 
         postings_enum->for_util = for_util;
 
-        initialize_max_data_size();
+        initialize_max_data_size(for_util);
 
         postings_enum->freq_buffer = allocation_get(MAX_DATA_SIZE * sizeof(*(postings_enum->freq_buffer)));
         postings_enum->doc_delta_buffer = allocation_get(MAX_DATA_SIZE * sizeof(*(postings_enum->doc_delta_buffer)));
@@ -859,6 +862,11 @@ static void read_block(data_input_t* in, for_util_t* for_util, uint8_t* encoded,
         return;
     }
 
+    if (!for_util->setup_done[num_bits]) {
+        fprintf(stderr, "format not implemented, but needed for num_bits=%d\n", num_bits);
+        exit(1);
+    }
+
     uint32_t encoded_size = for_util->encoded_sizes[num_bits];
     read_bytes(in, encoded, 0, encoded_size);
 
@@ -874,6 +882,11 @@ static void skip_block(data_input_t* in, for_util_t* for_util) {
     if (num_bits == ALL_VALUES_EQUAL) {
         read_vint(in);
         return;
+    }
+
+    if (!for_util->setup_done[num_bits]) {
+        fprintf(stderr, "format not implemented, but needed for num_bits=%d\n", num_bits);
+        exit(1);
     }
 
     uint32_t encoded_size = for_util->encoded_sizes[num_bits];
@@ -924,9 +937,12 @@ static void decode(packed_int_decoder_t* decoder, uint8_t* blocks, uint32_t bloc
 
 static void initialize_max_data_size(for_util_t* for_util) {
     if (MAX_DATA_SIZE == 0xFFFFFFFF) {
-        // todo simplified (one version, one packed_ints format)
         uint32_t max_data_size = 0;
         for (int i = 1; i <= 32; ++i) {
+            if (!for_util->setup_done[i]) {
+                // todo simplified (one version, one packed_ints format)
+                continue;
+            }
             packed_int_decoder_t* decoder = for_util->decoders + i;
             uint32_t iterations = (uint32_t) math_ceil((float) BLOCK_SIZE / decoder->byte_value_count);
             max_data_size = math_max(max_data_size, iterations * decoder->byte_value_count);
@@ -934,4 +950,71 @@ static void initialize_max_data_size(for_util_t* for_util) {
 
         MAX_DATA_SIZE = max_data_size;
     }
+}
+
+for_util_t* build_for_util(data_input_t* doc_in) {
+    for_util_t* for_util = allocation_get(sizeof(*for_util));
+
+    uint32_t packed_ints_version = read_vint(doc_in);
+
+    for_util->setup_done = allocation_get(33 * sizeof(*(for_util->setup_done)));
+    for_util->encoded_sizes = allocation_get(33 * sizeof(*(for_util->encoded_sizes)));
+    for_util->decoders = allocation_get(33 * sizeof(*(for_util->decoders)));
+    for_util->iterations = allocation_get(33 * sizeof(*(for_util->iterations)));
+
+    for (int i = 1; i < 33; ++i) {
+        uint32_t code = read_vint(doc_in);
+        uint32_t format_id = code >> 5;
+        uint32_t bits_per_value = (code & 31) + 1;
+
+        switch (format_id) {
+            case 0:
+                // PACKED: ok
+                break;
+            default:
+                // todo other formats...
+                fprintf(stderr, "format with id %d is not implemented (num_bits = %d)\n", format_id, i);
+                for_util->setup_done[i] = false;
+                continue;
+        }
+
+        for_util->encoded_sizes[i] = encoded_size(bits_per_value);
+        fill_decoder(for_util->decoders + i, bits_per_value);
+        for_util->iterations[i] = compute_iterations(&for_util->decoders[i]);
+        for_util->setup_done[i] = true;
+    }
+
+    return for_util;
+}
+
+static uint32_t encoded_size(uint32_t bits_per_value) {
+    return (uint32_t) (math_ceil((double) BLOCK_SIZE * bits_per_value / 8));
+}
+
+static void fill_decoder(packed_int_decoder_t* decoder, uint32_t bits_per_value) {
+    decoder->bits_per_value = bits_per_value;
+    uint32_t blocks = bits_per_value;
+    while ((blocks & 1) == 0) {
+        blocks >>= 1;
+    }
+    decoder->long_block_count = blocks;
+    decoder->long_value_count = 64 * decoder->long_block_count / bits_per_value;
+    uint32_t byte_block_count = 8 * decoder->long_block_count;
+    uint32_t byte_value_count = decoder->long_value_count;
+    while ((byte_block_count & 1) == 0 && (byte_value_count & 1) == 0) {
+        byte_block_count >>= 1;
+        byte_value_count >>= 1;
+    }
+    decoder->byte_block_count = byte_block_count;
+    decoder->byte_value_count = byte_value_count;
+    if (bits_per_value == 64) {
+        decoder->mask = ~0L;
+    } else {
+        decoder->mask = (1L << bits_per_value) - 1;
+    }
+    decoder->int_mask = (uint32_t) decoder->mask;
+}
+
+static uint32_t compute_iterations(packed_int_decoder_t* decoder) {
+    return (uint32_t) (math_ceil((float) BLOCK_SIZE * decoder->byte_value_count));
 }

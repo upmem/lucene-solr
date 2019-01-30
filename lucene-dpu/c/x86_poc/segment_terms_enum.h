@@ -108,12 +108,17 @@ struct _segment_term_enum_t {
 
 typedef struct {
     uint32_t bits_per_value;
+    uint32_t long_block_count;
+    uint32_t long_value_count;
     uint32_t byte_block_count;
     uint32_t byte_value_count;
+    uint64_t mask;
     uint32_t int_mask;
 } packed_int_decoder_t;
 
 typedef struct {
+    bool* setup_done;
+
     uint32_t* encoded_sizes;
     packed_int_decoder_t* decoders;
     uint32_t* iterations;
@@ -157,5 +162,7 @@ int32_t get_doc_freq(segment_terms_enum_t* terms_enum);
 int64_t get_total_term_freq(segment_terms_enum_t* terms_enum);
 
 postings_enum_t* impacts(segment_terms_enum_t* terms_enum, uint32_t flags, data_input_t* doc_in, for_util_t* for_util);
+
+for_util_t* build_for_util(data_input_t* doc_in);
 
 #endif //X86_POC_SEGMENT_TERMS_ENUM_H
