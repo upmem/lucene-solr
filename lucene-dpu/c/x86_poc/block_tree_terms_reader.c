@@ -28,13 +28,27 @@ typedef struct {
 static void seek_dir(data_input_t* in, uint32_t in_length);
 static fields_details_t* parse_fields_details(field_infos_t* field_infos, data_input_t* terms_in, uint32_t terms_in_length);
 static bytes_ref_t* read_bytes_ref(data_input_t* terms_in);
-static field_reader_t* field_reader_new(block_tree_term_reader_t* parent, field_info_t* field_info, uint64_t index_start_fp, uint32_t longs_size, data_input_t* index_in);
+static field_reader_t* field_reader_new(block_tree_term_reader_t* parent,
+                                        field_info_t* field_info,
+                                        uint64_t index_start_fp,
+                                        uint32_t longs_size,
+                                        uint32_t doc_count,
+                                        uint64_t sum_total_term_freq,
+                                        data_input_t* index_in);
 
-static field_reader_t* field_reader_new(block_tree_term_reader_t* parent, field_info_t* field_info, uint64_t index_start_fp, uint32_t longs_size, data_input_t* index_in) {
+static field_reader_t* field_reader_new(block_tree_term_reader_t* parent,
+                                        field_info_t* field_info,
+                                        uint64_t index_start_fp,
+                                        uint32_t longs_size,
+                                        uint32_t doc_count,
+                                        uint64_t sum_total_term_freq,
+                                        data_input_t* index_in) {
     field_reader_t* reader = allocation_get(sizeof(*reader));
 
     reader->field_info = field_info;
     reader->longs_size = longs_size;
+    reader->doc_count = doc_count;
+    reader->sum_total_term_freq = sum_total_term_freq;
     reader->parent = parent;
     // todo other fields if needed
 
@@ -70,7 +84,13 @@ block_tree_term_reader_t* block_tree_term_reader_new(field_infos_t* field_infos,
         field_info_t* field_info = field_infos->by_number[field_detail->field];
 
         field->name = field_info->name;
-        field->field_reader = field_reader_new(reader, field_info, index_start_fp, field_detail->longs_size, input_in);
+        field->field_reader = field_reader_new(reader,
+                                               field_info,
+                                               index_start_fp,
+                                               field_detail->longs_size,
+                                               field_detail->doc_count,
+                                               field_detail->sum_total_term_freq,
+                                               input_in);
     }
 
     return reader;

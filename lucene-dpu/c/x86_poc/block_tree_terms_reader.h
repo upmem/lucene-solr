@@ -15,6 +15,8 @@ typedef struct {
     field_info_t* field_info;
     fst_t* index;
     uint32_t longs_size;
+    uint32_t doc_count;
+    uint64_t sum_total_term_freq;
     block_tree_term_reader_t* parent;
 } field_reader_t;
 
