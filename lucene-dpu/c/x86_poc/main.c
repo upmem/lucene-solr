@@ -121,8 +121,14 @@ static void search(lucene_global_context_t *ctx, char* field, char* value) {
         int32_t doc_freq = get_doc_freq(terms_enum);
         int64_t total_term_freq = get_total_term_freq(terms_enum);
         printf("MATCH for '%s' (doc_freq=%d, total_term_freq=%ld)\n", term->bytes->bytes, doc_freq, total_term_freq);
+
         term_weight_t* weight = build_weight(term, SCORE_MODE_TOP_SCORES, 1.0f, term_state);
         term_scorer_t* scorer = build_scorer(weight, terms_enum, ctx->doc_in, ctx->for_util);
+
+        int32_t doc;
+        while ((doc = postings_next_doc(scorer->postings_enum)) != NO_MORE_DOCS) {
+            printf("doc:%d freq:%d\n", doc, scorer->postings_enum->freq);
+        }
     } else {
         printf("NO MATCH for '%s'\n", term->bytes->bytes);
     }

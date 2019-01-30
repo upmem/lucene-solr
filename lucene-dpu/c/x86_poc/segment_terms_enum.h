@@ -14,6 +14,8 @@
 #define POSTINGS_ENUM_FREQS (1 << 3)
 #define POSTINGS_ENUM_POSITIONS (1 << 4)
 
+#define NO_MORE_DOCS 0x7fffffff
+
 typedef struct {
     uint32_t doc_freq;
     int64_t total_term_freq;
@@ -162,6 +164,9 @@ int32_t get_doc_freq(segment_terms_enum_t* terms_enum);
 int64_t get_total_term_freq(segment_terms_enum_t* terms_enum);
 
 postings_enum_t* impacts(segment_terms_enum_t* terms_enum, uint32_t flags, data_input_t* doc_in, for_util_t* for_util);
+
+int32_t postings_next_doc(postings_enum_t* postings_enum);
+int32_t postings_advance(postings_enum_t* postings_enum, uint32_t target);
 
 for_util_t* build_for_util(data_input_t* doc_in);
 

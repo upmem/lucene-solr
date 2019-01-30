@@ -19,8 +19,6 @@
 
 #define ALL_VALUES_EQUAL 0
 
-#define NO_MORE_DOCS 0x7fffffff
-
 typedef enum {
     SEEK_STATUS_END,
     SEEK_STATUS_FOUND,
