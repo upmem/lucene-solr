@@ -4,12 +4,10 @@
 
 #include "parser_codec_footer.h"
 #include "allocation.h"
-#include "data_input.h"
 
 #include <stdio.h>
 
-lucene_codec_footer_t *read_codec_footer(data_input_t *buffer)
-{
+lucene_codec_footer_t *read_codec_footer(data_input_t *buffer) {
     lucene_codec_footer_t *codec_footer = allocation_get(sizeof(lucene_codec_footer_t));
 
     codec_footer->Magic_footer = read_int(buffer);
@@ -19,8 +17,7 @@ lucene_codec_footer_t *read_codec_footer(data_input_t *buffer)
     return codec_footer;
 }
 
-void print_codec_footer(lucene_codec_footer_t *codec_footer)
-{
+void print_codec_footer(lucene_codec_footer_t *codec_footer) {
     printf("MagicFooter: %i\n"
            "AlgorithmID: %i\n"
            "Checksum: %llu\n",
@@ -29,7 +26,6 @@ void print_codec_footer(lucene_codec_footer_t *codec_footer)
            codec_footer->Checksum);
 }
 
-void free_codec_footer(lucene_codec_footer_t *codec_footer)
-{
+void free_codec_footer(lucene_codec_footer_t *codec_footer) {
     allocation_free(codec_footer);
 }

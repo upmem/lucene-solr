@@ -39,7 +39,7 @@ typedef struct {
     bool has_terms_orig;
     bool is_floor;
 
-    arc_t* arc;
+    arc_t *arc;
 
     uint64_t fp;
     uint64_t fp_orig;
@@ -56,9 +56,9 @@ typedef struct {
 
     uint32_t metadata_up_to;
 
-    block_term_state_t* state;
+    block_term_state_t *state;
 
-    segment_terms_enum_t* ste;
+    segment_terms_enum_t *ste;
 
     uint32_t next_floor_label;
     uint32_t num_follow_floor_blocks;
@@ -67,11 +67,11 @@ typedef struct {
     uint32_t suffix;
     uint64_t sub_code;
 
-    uint8_t* suffix_bytes;
-    uint8_t* floor_data;
-    uint8_t* stat_bytes;
-    int64_t* longs;
-    uint8_t* bytes;
+    uint8_t *suffix_bytes;
+    uint8_t *floor_data;
+    uint8_t *stat_bytes;
+    int64_t *longs;
+    uint8_t *bytes;
 
     uint32_t suffix_bytes_length;
     uint32_t floor_data_length;
@@ -79,31 +79,31 @@ typedef struct {
     uint32_t longs_length;
     uint32_t bytes_length;
 
-    data_input_t* suffixes_reader;
-    data_input_t* floor_data_reader;
-    data_input_t* stats_reader;
-    data_input_t* bytes_reader;
+    data_input_t *suffixes_reader;
+    data_input_t *floor_data_reader;
+    data_input_t *stats_reader;
+    data_input_t *bytes_reader;
 } segment_terms_enum_frame_t;
 
 struct _segment_term_enum_t {
-    data_input_t* in;
+    data_input_t *in;
 
-    segment_terms_enum_frame_t* static_frame;
-    segment_terms_enum_frame_t* current_frame;
+    segment_terms_enum_frame_t *static_frame;
+    segment_terms_enum_frame_t *current_frame;
 
     int32_t target_before_current_length;
 
-    field_reader_t* field_reader;
-    data_input_t* fst_reader;
+    field_reader_t *field_reader;
+    data_input_t *fst_reader;
 
-    arc_t* arcs;
+    arc_t *arcs;
     uint32_t arcs_length;
-    segment_terms_enum_frame_t* stack;
+    segment_terms_enum_frame_t *stack;
     uint32_t stack_length;
 
     uint32_t valid_index_prefix;
 
-    bytes_ref_t* term;
+    bytes_ref_t *term;
 
     bool term_exists;
 };
@@ -119,16 +119,16 @@ typedef struct {
 } packed_int_decoder_t;
 
 typedef struct {
-    bool* setup_done;
+    bool *setup_done;
 
-    uint32_t* encoded_sizes;
-    packed_int_decoder_t* decoders;
-    uint32_t* iterations;
+    uint32_t *encoded_sizes;
+    packed_int_decoder_t *decoders;
+    uint32_t *iterations;
 } for_util_t;
 
 typedef struct {
-    data_input_t* start_doc_in;
-    data_input_t* doc_in;
+    data_input_t *start_doc_in;
+    data_input_t *doc_in;
 
     bool index_has_freq;
     bool index_has_pos;
@@ -144,30 +144,35 @@ typedef struct {
     int32_t doc;
     int32_t freq;
     bool needs_freq;
-    int32_t* doc_delta_buffer;
-    int32_t* freq_buffer;
+    int32_t *doc_delta_buffer;
+    int32_t *freq_buffer;
     uint32_t accum;
     uint32_t doc_up_to;
     uint32_t next_skip_doc;
     uint32_t doc_buffer_up_to;
     bool skipped;
 
-    uint8_t* encoded;
+    uint8_t *encoded;
 
-    for_util_t* for_util;
+    for_util_t *for_util;
 } postings_enum_t;
 
-segment_terms_enum_t* segment_terms_enum_new(field_reader_t *field_reader);
-bool seek_exact(segment_terms_enum_t* terms_enum, bytes_ref_t* target);
-block_term_state_t* get_term_state(segment_terms_enum_t* terms_enum);
-int32_t get_doc_freq(segment_terms_enum_t* terms_enum);
-int64_t get_total_term_freq(segment_terms_enum_t* terms_enum);
+segment_terms_enum_t *segment_terms_enum_new(field_reader_t *field_reader);
 
-postings_enum_t* impacts(segment_terms_enum_t* terms_enum, uint32_t flags, data_input_t* doc_in, for_util_t* for_util);
+bool seek_exact(segment_terms_enum_t *terms_enum, bytes_ref_t *target);
 
-int32_t postings_next_doc(postings_enum_t* postings_enum);
-int32_t postings_advance(postings_enum_t* postings_enum, uint32_t target);
+block_term_state_t *get_term_state(segment_terms_enum_t *terms_enum);
 
-for_util_t* build_for_util(data_input_t* doc_in);
+int32_t get_doc_freq(segment_terms_enum_t *terms_enum);
+
+int64_t get_total_term_freq(segment_terms_enum_t *terms_enum);
+
+postings_enum_t *impacts(segment_terms_enum_t *terms_enum, uint32_t flags, data_input_t *doc_in, for_util_t *for_util);
+
+int32_t postings_next_doc(postings_enum_t *postings_enum);
+
+int32_t postings_advance(postings_enum_t *postings_enum, uint32_t target);
+
+for_util_t *build_for_util(data_input_t *doc_in);
 
 #endif //X86_POC_SEGMENT_TERMS_ENUM_H

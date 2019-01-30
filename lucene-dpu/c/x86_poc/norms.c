@@ -1,19 +1,15 @@
 #include "norms.h"
-#include "field_infos.h"
 #include "allocation.h"
 
-#include <stdbool.h>
 #include <assert.h>
 
-static bool hasNorms(field_info_t *field_info)
-{
+static bool hasNorms(field_info_t *field_info) {
     return field_info->index_options != INDEX_OPTIONS_NONE && field_info->omit_norms == false;
 }
 
 static norms_entry_t **readFields_rec(data_input_t *norms_metadata,
                                       uint32_t max_field_info_number,
-                                      field_infos_t *field_infos)
-{
+                                      field_infos_t *field_infos) {
     int32_t fieldNumber = read_int(norms_metadata);
     norms_entry_t **norms_field_map;
     norms_entry_t *curr_field = allocation_get(sizeof(norms_entry_t));
@@ -22,7 +18,7 @@ static norms_entry_t **readFields_rec(data_input_t *norms_metadata,
 
 
     if (fieldNumber == -1) {
-        return (norms_entry_t **)allocation_get((max_field_info_number + 1) * sizeof(norms_entry_t *));
+        return (norms_entry_t **) allocation_get((max_field_info_number + 1) * sizeof(norms_entry_t *));
     }
 
     field_info = field_infos->by_number[fieldNumber];
@@ -59,8 +55,7 @@ norms_reader_t *norms_reader_new(data_input_t *norms_metadata,
                                  uint32_t norms_metadata_length,
                                  data_input_t *norms_data,
                                  uint32_t norms_data_length,
-                                 field_infos_t *field_infos)
-{
+                                 field_infos_t *field_infos) {
     norms_reader_t *reader = allocation_get(sizeof(norms_reader_t));
     lucene_index_header_t *index_header = read_index_header(norms_metadata);
     free_index_header(index_header);
@@ -76,8 +71,7 @@ norms_reader_t *norms_reader_new(data_input_t *norms_metadata,
     return reader;
 }
 
-uint64_t getNorms(norms_reader_t *reader, uint32_t field_number, int doc)
-{
+uint64_t getNorms(norms_reader_t *reader, uint32_t field_number, int doc) {
     norms_entry_t *entry = reader->norms_entries[field_number];
 
     if (entry->docsWithFieldOffset == -2) {
@@ -90,20 +84,16 @@ uint64_t getNorms(norms_reader_t *reader, uint32_t field_number, int doc)
         slice->skip_bytes(slice, entry->normsOffset);
         slice->skip_bytes(slice, doc * entry->bytesPerNorm);
         switch (entry->bytesPerNorm) {
-        case 1:
-            return slice->read_byte(slice);
-            break;
-        case 2:
-            return read_short(slice);
-            break;
-        case 4:
-            return read_int(slice);
-            break;
-        case 8:
-            return read_long(slice);
-            break;
-        default:
-            assert(0);
+            case 1:
+                return slice->read_byte(slice);
+            case 2:
+                return read_short(slice);
+            case 4:
+                return read_int(slice);
+            case 8:
+                return read_long(slice);
+            default:
+                assert(0);
         }
     } else {
         assert(0 && "to be implemented\n"); /* Lucene80NormsProducer.java:318 */

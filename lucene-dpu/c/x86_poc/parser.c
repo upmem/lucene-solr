@@ -13,31 +13,30 @@
 #define STRING_MAX_SIZE (512)
 
 static const char *lucene_file_extension[LUCENE_FILE_ENUM_LENGTH] =
-    {
-     [LUCENE_FILE_SI] = ".si",
-     [LUCENE_FILE_CFE] = ".cfe",
-     [LUCENE_FILE_CFS] = ".cfs",
-     [LUCENE_FILE_FNM] = ".fnm",
-     [LUCENE_FILE_FDX] = ".fdx",
-     [LUCENE_FILE_FDT] = ".fdt",
-     [LUCENE_FILE_TIM] = ".tim",
-     [LUCENE_FILE_TIP] = ".tip",
-     [LUCENE_FILE_DOC] = ".doc",
-     [LUCENE_FILE_POS] = ".pos",
-     [LUCENE_FILE_PAY] = ".pay",
-     [LUCENE_FILE_NVD] = ".nvd",
-     [LUCENE_FILE_NVM] = ".nvm",
-     [LUCENE_FILE_DVD] = ".dvd",
-     [LUCENE_FILE_DVM] = ".dvm",
-     [LUCENE_FILE_TVX] = ".tvx",
-     [LUCENE_FILE_TVD] = ".tvd",
-     [LUCENE_FILE_LIV] = ".liv",
-     [LUCENE_FILE_DII] = ".dii",
-     [LUCENE_FILE_DIM] = ".dim",
-    };
+        {
+                [LUCENE_FILE_SI] = ".si",
+                [LUCENE_FILE_CFE] = ".cfe",
+                [LUCENE_FILE_CFS] = ".cfs",
+                [LUCENE_FILE_FNM] = ".fnm",
+                [LUCENE_FILE_FDX] = ".fdx",
+                [LUCENE_FILE_FDT] = ".fdt",
+                [LUCENE_FILE_TIM] = ".tim",
+                [LUCENE_FILE_TIP] = ".tip",
+                [LUCENE_FILE_DOC] = ".doc",
+                [LUCENE_FILE_POS] = ".pos",
+                [LUCENE_FILE_PAY] = ".pay",
+                [LUCENE_FILE_NVD] = ".nvd",
+                [LUCENE_FILE_NVM] = ".nvm",
+                [LUCENE_FILE_DVD] = ".dvd",
+                [LUCENE_FILE_DVM] = ".dvm",
+                [LUCENE_FILE_TVX] = ".tvx",
+                [LUCENE_FILE_TVD] = ".tvd",
+                [LUCENE_FILE_LIV] = ".liv",
+                [LUCENE_FILE_DII] = ".dii",
+                [LUCENE_FILE_DIM] = ".dim",
+        };
 
-static lucene_file_e extension_to_index(uint8_t *file_name)
-{
+static lucene_file_e extension_to_index(uint8_t *file_name) {
     unsigned int each;
     for (each = 0; each < LUCENE_FILE_ENUM_LENGTH; each++) {
         size_t file_name_size = strlen(file_name);
@@ -51,8 +50,7 @@ static FILE *file_open(char *path,
                        unsigned int segment_id,
                        char *filename,
                        lucene_file_e file_type,
-                       lucene_si_file_t *si_file)
-{
+                       lucene_si_file_t *si_file) {
     char suffix_filename[STRING_MAX_SIZE];
     sprintf(suffix_filename, "_%u%s\0", segment_id, lucene_file_extension[file_type]);
     check_file_in_si(si_file, suffix_filename);
@@ -64,9 +62,8 @@ static FILE *file_open(char *path,
 static void generate_file_buffers_from_cfs(char *path,
                                            unsigned int segment_id,
                                            char *filename,
-                                           file_buffer_t* file_buffers,
-                                           lucene_si_file_t *si_file)
-{
+                                           file_buffer_t *file_buffers,
+                                           lucene_si_file_t *si_file) {
     FILE *f_cfe, *f_cfs;
     lucene_cfe_file_t *cfe_file;
     char suffix_filename[STRING_MAX_SIZE];
@@ -108,12 +105,11 @@ static void generate_file_buffers_from_cfs(char *path,
     free_cfe_file(cfe_file);
 }
 
-file_buffer_t* get_file_buffers(char *path, unsigned int segment_id)
-{
+file_buffer_t *get_file_buffers(char *path, unsigned int segment_id) {
     char filename[STRING_MAX_SIZE];
     FILE *f_si;
     lucene_si_file_t *si_file;
-    file_buffer_t* file_buffers = calloc(LUCENE_FILE_ENUM_LENGTH, sizeof(*file_buffers));
+    file_buffer_t *file_buffers = calloc(LUCENE_FILE_ENUM_LENGTH, sizeof(*file_buffers));
 
     sprintf(filename, "%s/_%u%s", path, segment_id, lucene_file_extension[LUCENE_FILE_SI]);
     f_si = fopen(filename, "r");
@@ -135,8 +131,7 @@ file_buffer_t* get_file_buffers(char *path, unsigned int segment_id)
     return file_buffers;
 }
 
-void free_file_buffers(file_buffer_t* file_buffers)
-{
+void free_file_buffers(file_buffer_t *file_buffers) {
     unsigned int each;
     for (each = 0; each < LUCENE_FILE_ENUM_LENGTH; each++) {
         if (file_buffers[each].content != NULL) {

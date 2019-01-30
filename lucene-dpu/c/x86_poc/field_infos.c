@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "field_infos.h"
-#include "data_input.h"
 #include "allocation.h"
 #include "parser_index_header.h"
 
@@ -84,15 +83,16 @@ field_infos_t *read_field_infos(file_buffer_t *file) {
         }
 
         fill_field_info(infos + i, name, field_number, doc_values_type, store_term_vector, omit_norms, index_options,
-                store_payloads, attributes, dv_gen, point_data_dimension_count, point_index_dimension_count, point_num_bytes,
-                is_soft_deletes_field);
+                        store_payloads, attributes, dv_gen, point_data_dimension_count, point_index_dimension_count,
+                        point_num_bytes,
+                        is_soft_deletes_field);
     }
 
     return field_infos_new(infos, size);
 }
 
 static field_infos_t *field_infos_new(field_info_t *infos, uint32_t infos_length) {
-    field_infos_t* result = allocation_get(sizeof(*result));
+    field_infos_t *result = allocation_get(sizeof(*result));
 
     result->has_vectors = false;
     result->has_prox = false;
@@ -115,12 +115,13 @@ static field_infos_t *field_infos_new(field_info_t *infos, uint32_t infos_length
     result->by_number = allocation_get(result->by_number_length * sizeof(*(result->by_number)));
 
     for (int i = 0; i < infos_length; ++i) {
-        field_info_t* info = infos + i;
+        field_info_t *info = infos + i;
 
         result->has_vectors |= info->store_term_vector;
         result->has_prox |= compare_index_options(info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
         result->has_freq |= info->index_options != INDEX_OPTIONS_DOCS;
-        result->has_offsets |= compare_index_options(info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0;
+        result->has_offsets |=
+                compare_index_options(info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0;
         result->has_norms |= (info->index_options != INDEX_OPTIONS_NONE) && !info->omit_norms;
         result->has_doc_values |= info->doc_values_type != DOC_VALUES_TYPE_NONE;
         result->has_payloads |= info->store_payloads;
@@ -155,7 +156,7 @@ static index_options_t get_index_options(uint8_t b) {
 }
 
 static doc_values_type_t get_doc_values_types(uint8_t b) {
-    switch(b) {
+    switch (b) {
         case 0:
             return DOC_VALUES_TYPE_NONE;
         case 1:

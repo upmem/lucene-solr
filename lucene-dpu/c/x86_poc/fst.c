@@ -27,24 +27,31 @@ static inline bool arc_flag(uint8_t flags, uint8_t bit) {
     return (flags & bit) != 0;
 }
 
-static inline arc_t* _find_target_arc(fst_t* fst, int32_t label_to_match, arc_t* follow, arc_t* arc, data_input_t* in, bool use_root_arc_cache);
-static arc_t* copy_arc_from(arc_t* arc, arc_t* other);
-static int32_t read_label(fst_t* fst, data_input_t* in);
+static inline arc_t *_find_target_arc(fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, data_input_t *in,
+                                      bool use_root_arc_cache);
 
-static arc_t* read_first_real_target_arc(fst_t* fst, int64_t address, arc_t* arc, data_input_t* in);
-static arc_t* read_next_real_arc(fst_t* fst, arc_t* arc, data_input_t* in);
+static arc_t *copy_arc_from(arc_t *arc, arc_t *other);
 
-static bytes_ref_t* read_output(data_input_t* in);
-static bytes_ref_t* read_final_output(data_input_t* in);
-static void skip_output(data_input_t* in);
-static void skip_final_output(data_input_t* in);
+static int32_t read_label(fst_t *fst, data_input_t *in);
 
-static void seek_to_next_node(fst_t* fst, data_input_t* in);
+static arc_t *read_first_real_target_arc(fst_t *fst, int64_t address, arc_t *arc, data_input_t *in);
 
-static void cache_root_arcs(fst_t* fst);
+static arc_t *read_next_real_arc(fst_t *fst, arc_t *arc, data_input_t *in);
 
-fst_t* fst_new(data_input_t* in) {
-    fst_t* result = allocation_get(sizeof(*result));
+static bytes_ref_t *read_output(data_input_t *in);
+
+static bytes_ref_t *read_final_output(data_input_t *in);
+
+static void skip_output(data_input_t *in);
+
+static void skip_final_output(data_input_t *in);
+
+static void seek_to_next_node(fst_t *fst, data_input_t *in);
+
+static void cache_root_arcs(fst_t *fst);
+
+fst_t *fst_new(data_input_t *in) {
+    fst_t *result = allocation_get(sizeof(*result));
 
     check_header(in);
 
@@ -54,7 +61,7 @@ fst_t* fst_new(data_input_t* in) {
         if (num_bytes <= 0) {
             result->empty_output = (bytes_ref_t *) &EMPTY_BYTES;
         } else {
-            uint8_t* empty_bytes = allocation_get((size_t) num_bytes);
+            uint8_t *empty_bytes = allocation_get((size_t) num_bytes);
 
             read_bytes(in, empty_bytes, 0, (uint32_t) num_bytes);
 
@@ -98,8 +105,8 @@ fst_t* fst_new(data_input_t* in) {
     return result;
 }
 
-arc_t* get_first_arc(fst_t* fst, arc_t* arc) {
-    bytes_ref_t* NO_OUTPUT = (bytes_ref_t *) &EMPTY_BYTES;
+arc_t *get_first_arc(fst_t *fst, arc_t *arc) {
+    bytes_ref_t *NO_OUTPUT = (bytes_ref_t *) &EMPTY_BYTES;
 
     if (fst->empty_output != NULL) {
         arc->flags = BIT_FINAL_ARC | BIT_LAST_ARC;
@@ -118,18 +125,19 @@ arc_t* get_first_arc(fst_t* fst, arc_t* arc) {
     return arc;
 }
 
-arc_t* find_target_arc(fst_t* fst, int32_t label_to_match, arc_t* follow, arc_t* arc, data_input_t* in) {
+arc_t *find_target_arc(fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, data_input_t *in) {
     return _find_target_arc(fst, label_to_match, follow, arc, in, true);
 }
 
-static void cache_root_arcs(fst_t* fst) {
+static void cache_root_arcs(fst_t *fst) {
     // todo: currently caching is disabled
 
     fst->cached_root_arcs = NULL;
     fst->cached_root_arcs_length = 0;
 }
 
-static inline arc_t* _find_target_arc(fst_t* fst, int32_t label_to_match, arc_t* follow, arc_t* arc, data_input_t* in, bool use_root_arc_cache) {
+static inline arc_t *_find_target_arc(fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, data_input_t *in,
+                                      bool use_root_arc_cache) {
     if (label_to_match == END_LABEL) {
         if (arc_is_final(follow)) {
             if (follow->target <= 0) {
@@ -146,8 +154,9 @@ static inline arc_t* _find_target_arc(fst_t* fst, int32_t label_to_match, arc_t*
         }
     }
 
-    if (use_root_arc_cache && (fst->cached_root_arcs != NULL) && (follow->target == fst->start_node) && (label_to_match < fst->cached_root_arcs_length)) {
-        arc_t* result = fst->cached_root_arcs[label_to_match];
+    if (use_root_arc_cache && (fst->cached_root_arcs != NULL) && (follow->target == fst->start_node) &&
+        (label_to_match < fst->cached_root_arcs_length)) {
+        arc_t *result = fst->cached_root_arcs[label_to_match];
 
         if (result == NULL) {
             return NULL;
@@ -203,15 +212,15 @@ static inline arc_t* _find_target_arc(fst_t* fst, int32_t label_to_match, arc_t*
     }
 }
 
-bool arc_is_final(arc_t* arc) {
+bool arc_is_final(arc_t *arc) {
     return arc_flag(arc->flags, BIT_FINAL_ARC);
 }
 
-bool arc_is_last(arc_t* arc) {
+bool arc_is_last(arc_t *arc) {
     return arc_flag(arc->flags, BIT_LAST_ARC);
 }
 
-static arc_t* copy_arc_from(arc_t* arc, arc_t* other) {
+static arc_t *copy_arc_from(arc_t *arc, arc_t *other) {
     arc->label = other->label;
     arc->target = other->target;
     arc->flags = other->flags;
@@ -228,7 +237,7 @@ static arc_t* copy_arc_from(arc_t* arc, arc_t* other) {
     return arc;
 }
 
-static int32_t read_label(fst_t* fst, data_input_t* in) {
+static int32_t read_label(fst_t *fst, data_input_t *in) {
     int32_t v;
 
     if (fst->input_type == INPUT_TYPE_BYTE1) {
@@ -242,7 +251,7 @@ static int32_t read_label(fst_t* fst, data_input_t* in) {
     return v;
 }
 
-static arc_t* read_first_real_target_arc(fst_t* fst, int64_t address, arc_t* arc, data_input_t* in) {
+static arc_t *read_first_real_target_arc(fst_t *fst, int64_t address, arc_t *arc, data_input_t *in) {
     in->index = (uint32_t) address;
 
     if (in->read_byte(in) == ARCS_AS_FIXED_ARRAY) {
@@ -258,7 +267,7 @@ static arc_t* read_first_real_target_arc(fst_t* fst, int64_t address, arc_t* arc
     return read_next_real_arc(fst, arc, in);
 }
 
-static arc_t* read_next_real_arc(fst_t* fst, arc_t* arc, data_input_t* in) {
+static arc_t *read_next_real_arc(fst_t *fst, arc_t *arc, data_input_t *in) {
     if (arc->bytes_per_arc != 0) {
         arc->arc_idx++;
         in->index = (uint32_t) arc->pos_arcs_start;
@@ -307,13 +316,13 @@ static arc_t* read_next_real_arc(fst_t* fst, arc_t* arc, data_input_t* in) {
     return arc;
 }
 
-static bytes_ref_t* read_output(data_input_t* in) {
+static bytes_ref_t *read_output(data_input_t *in) {
     uint32_t length = read_vint(in);
 
     if (length == 0) {
         return (bytes_ref_t *) &EMPTY_BYTES;
     } else {
-        bytes_ref_t* result = allocation_get(sizeof(*result));
+        bytes_ref_t *result = allocation_get(sizeof(*result));
         result->bytes = allocation_get(length);
         result->offset = 0;
         read_bytes(in, result->bytes, 0, length);
@@ -322,11 +331,11 @@ static bytes_ref_t* read_output(data_input_t* in) {
     }
 }
 
-static bytes_ref_t* read_final_output(data_input_t* in) {
+static bytes_ref_t *read_final_output(data_input_t *in) {
     return read_output(in);
 }
 
-static void skip_output(data_input_t* in) {
+static void skip_output(data_input_t *in) {
     uint32_t length = read_vint(in);
 
     if (length != 0) {
@@ -334,11 +343,11 @@ static void skip_output(data_input_t* in) {
     }
 }
 
-static void skip_final_output(data_input_t* in) {
+static void skip_final_output(data_input_t *in) {
     skip_output(in);
 }
 
-static void seek_to_next_node(fst_t* fst, data_input_t* in) {
+static void seek_to_next_node(fst_t *fst, data_input_t *in) {
     while (true) {
         uint8_t flags = in->read_byte(in);
         read_label(fst, in);
@@ -361,8 +370,8 @@ static void seek_to_next_node(fst_t* fst, data_input_t* in) {
     }
 }
 
-data_input_t* fst_get_bytes_reader(fst_t* fst) {
-    data_input_t* result = allocation_get(sizeof(*result));
+data_input_t *fst_get_bytes_reader(fst_t *fst) {
+    data_input_t *result = allocation_get(sizeof(*result));
 
     result->buffer = fst->bytes_array;
     result->index = fst->bytes_array_length - 1;

@@ -3,25 +3,21 @@
  */
 
 #include "parser_si.h"
-#include "parser_index_header.h"
-#include "parser_codec_footer.h"
 #include "allocation.h"
-#include "data_input.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
-lucene_si_file_t *parse_si_file(FILE *f_si)
-{
+lucene_si_file_t *parse_si_file(FILE *f_si) {
     lucene_si_file_t *si_file;
     size_t si_file_size;
     data_input_t buffer =
-        {
-         .index = 0,
-         .read_byte = incremental_read_byte,
-         .skip_bytes = incremental_skip_bytes,
-        };
+            {
+                    .index = 0,
+                    .read_byte = incremental_read_byte,
+                    .skip_bytes = incremental_skip_bytes,
+            };
     unsigned int each;
     uint32_t unused_length;
 
@@ -53,24 +49,24 @@ lucene_si_file_t *parse_si_file(FILE *f_si)
     si_file->IsCompoundFile = incremental_read_byte(&buffer);
 
     si_file->DiagnosticsCount = read_vint(&buffer);
-    si_file->Diagnostics = (uint8_t ***)allocation_get(si_file->DiagnosticsCount * sizeof(uint8_t **));
+    si_file->Diagnostics = (uint8_t ***) allocation_get(si_file->DiagnosticsCount * sizeof(uint8_t **));
     for (each = 0; each < si_file->DiagnosticsCount; each++) {
-        si_file->Diagnostics[each] = (uint8_t **)allocation_get(2 * sizeof(uint8_t *));
+        si_file->Diagnostics[each] = (uint8_t **) allocation_get(2 * sizeof(uint8_t *));
 
         si_file->Diagnostics[each][0] = read_string(&buffer, &unused_length);
         si_file->Diagnostics[each][1] = read_string(&buffer, &unused_length);
     }
 
     si_file->FilesCount = read_vint(&buffer);
-    si_file->Files = (uint8_t **)allocation_get(si_file->FilesCount * sizeof(uint8_t *));
+    si_file->Files = (uint8_t **) allocation_get(si_file->FilesCount * sizeof(uint8_t *));
     for (each = 0; each < si_file->FilesCount; each++) {
         si_file->Files[each] = read_string(&buffer, &unused_length);
     }
 
     si_file->AttributesCount = read_vint(&buffer);
-    si_file->Attributes = (uint8_t ***)allocation_get(si_file->AttributesCount * sizeof(uint8_t **));
+    si_file->Attributes = (uint8_t ***) allocation_get(si_file->AttributesCount * sizeof(uint8_t **));
     for (each = 0; each < si_file->AttributesCount; each++) {
-        si_file->Attributes[each] = (uint8_t **)allocation_get(2 * sizeof(uint8_t *));
+        si_file->Attributes[each] = (uint8_t **) allocation_get(2 * sizeof(uint8_t *));
 
         si_file->Attributes[each][0] = read_string(&buffer, &unused_length);
         si_file->Attributes[each][1] = read_string(&buffer, &unused_length);
@@ -84,8 +80,7 @@ lucene_si_file_t *parse_si_file(FILE *f_si)
     return si_file;
 }
 
-void print_si_file(lucene_si_file_t *si_file)
-{
+void print_si_file(lucene_si_file_t *si_file) {
     unsigned int each;
     print_index_header(si_file->index_header);
 
@@ -124,8 +119,7 @@ void print_si_file(lucene_si_file_t *si_file)
     print_codec_footer(si_file->codec_footer);
 }
 
-void free_si_file(lucene_si_file_t *si_file)
-{
+void free_si_file(lucene_si_file_t *si_file) {
     unsigned int each;
 
     free_index_header(si_file->index_header);
@@ -154,8 +148,7 @@ void free_si_file(lucene_si_file_t *si_file)
     allocation_free(si_file);
 }
 
-void check_file_in_si(lucene_si_file_t *si_file, char *filename)
-{
+void check_file_in_si(lucene_si_file_t *si_file, char *filename) {
     unsigned int each;
     for (each = 0; each < si_file->FilesCount; each++) {
         if (!strcmp(filename, si_file->Files[each]))
