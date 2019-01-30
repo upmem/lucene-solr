@@ -5,7 +5,10 @@
 #ifndef X86_POC_MATH_H
 #define X86_POC_MATH_H
 
-#define min(x, y) (((x) < (y)) ? (x) : (y))
-#define max(x, y) (((x) > (y)) ? (x) : (y))
+#include <math.h>
+
+#define math_min(x, y) (((x) < (y)) ? (x) : (y))
+#define math_max(x, y) (((x) > (y)) ? (x) : (y))
+#define math_ceil(f) ((int) ceil(f))
 
 #endif //X86_POC_MATH_H

@@ -11,6 +11,9 @@
 #include "fst.h"
 #include "block_tree_terms_reader.h"
 
+#define POSTINGS_ENUM_FREQS (1 << 3)
+#define POSTINGS_ENUM_POSITIONS (1 << 4)
+
 typedef struct {
     uint32_t doc_freq;
     int64_t total_term_freq;
@@ -103,10 +106,56 @@ struct _segment_term_enum_t {
     bool term_exists;
 };
 
+typedef struct {
+    uint32_t bits_per_value;
+    uint32_t byte_block_count;
+    uint32_t byte_value_count;
+    uint32_t int_mask;
+} packed_int_decoder_t;
+
+typedef struct {
+    uint32_t* encoded_sizes;
+    packed_int_decoder_t* decoders;
+    uint32_t* iterations;
+} for_util_t;
+
+typedef struct {
+    data_input_t* start_doc_in;
+    data_input_t* doc_in;
+
+    bool index_has_freq;
+    bool index_has_pos;
+    bool index_has_offsets;
+    bool index_has_payloads;
+
+    uint32_t doc_freq;
+    uint64_t total_term_freq;
+    uint64_t doc_term_start_fp;
+    int64_t skip_offset;
+    int32_t singleton_doc_id;
+
+    int32_t doc;
+    int32_t freq;
+    bool needs_freq;
+    int32_t* doc_delta_buffer;
+    int32_t* freq_buffer;
+    uint32_t accum;
+    uint32_t doc_up_to;
+    uint32_t next_skip_doc;
+    uint32_t doc_buffer_up_to;
+    bool skipped;
+
+    uint8_t* encoded;
+
+    for_util_t* for_util;
+} postings_enum_t;
+
 segment_terms_enum_t* segment_terms_enum_new(field_reader_t *field_reader);
 bool seek_exact(segment_terms_enum_t* terms_enum, bytes_ref_t* target);
 block_term_state_t* get_term_state(segment_terms_enum_t* terms_enum);
 int32_t get_doc_freq(segment_terms_enum_t* terms_enum);
 int64_t get_total_term_freq(segment_terms_enum_t* terms_enum);
+
+postings_enum_t* impacts(segment_terms_enum_t* terms_enum, uint32_t flags, data_input_t* doc_in, for_util_t* for_util);
 
 #endif //X86_POC_SEGMENT_TERMS_ENUM_H

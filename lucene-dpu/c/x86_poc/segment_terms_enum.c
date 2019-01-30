@@ -15,6 +15,11 @@
 #define OUTPUT_FLAG_HAS_TERMS 0x2
 
 #define BLOCK_SIZE 128
+#define MAX_ENCODED_SIZE (BLOCK_SIZE * 4)
+
+#define ALL_VALUES_EQUAL 0
+
+#define NO_MORE_DOCS 0x7fffffff
 
 typedef enum {
     SEEK_STATUS_END,
@@ -48,6 +53,18 @@ static void init_index_input(segment_terms_enum_t* terms_enum);
 static block_term_state_t* block_term_state_new(void);
 static void decode_metadata(segment_terms_enum_frame_t* frame);
 static void decode_term(int64_t* longs, data_input_t* in, field_info_t* field_info, block_term_state_t* state, bool absolute);
+static postings_enum_t* postings_enum_reset(postings_enum_t* postings_enum, block_term_state_t* state, uint32_t flags);
+
+static void postings_refill_docs(postings_enum_t* postings_enum);
+
+static void read_block(data_input_t* in, for_util_t* for_util, uint8_t* encoded, int32_t* decoded);
+static void skip_block(data_input_t* in, for_util_t* for_util);
+static void read_vint_block(data_input_t* doc_in, int32_t* doc_buffer, int32_t* freq_buffer, uint32_t num, bool index_has_freq);
+static void decode(packed_int_decoder_t* decoder, uint8_t* blocks, uint32_t blocks_offset, int32_t* values, uint32_t values_offset, uint32_t iterations);
+
+static uint32_t MAX_DATA_SIZE = 0xFFFFFFFF;
+
+static void initialize_max_data_size();
 
 segment_terms_enum_t* segment_terms_enum_new(field_reader_t *field_reader) {
     segment_terms_enum_t* terms_enum = allocation_get(sizeof(*terms_enum));
@@ -106,7 +123,7 @@ bool seek_exact(segment_terms_enum_t* terms_enum, bytes_ref_t* target) {
         target_up_to = 0;
 
         segment_terms_enum_frame_t* last_frame = &terms_enum->stack[0];
-        uint32_t target_limit = min(target->length, terms_enum->valid_index_prefix);
+        uint32_t target_limit = math_min(target->length, terms_enum->valid_index_prefix);
 
         int32_t cmp = 0;
 
@@ -131,7 +148,7 @@ bool seek_exact(segment_terms_enum_t* terms_enum, bytes_ref_t* target) {
         if (cmp == 0) {
             uint32_t target_up_to_mid = target_up_to;
 
-            uint32_t target_limit_2 = min(target->length, terms_enum->term->length);
+            uint32_t target_limit_2 = math_min(target->length, terms_enum->term->length);
 
             while (target_up_to < target_limit_2) {
                 cmp = (terms_enum->term->bytes[target_up_to] & 0xFF) - (target->bytes[target->offset + target_up_to] & 0xFF);
@@ -715,5 +732,206 @@ static void decode_term(int64_t* longs, data_input_t* in, field_info_t* field_in
         state->skip_offset = read_vlong(in);
     } else {
         state->skip_offset = -1;
+    }
+}
+
+postings_enum_t* impacts(segment_terms_enum_t* terms_enum, uint32_t flags, data_input_t* doc_in, for_util_t* for_util) {
+    decode_metadata(terms_enum->current_frame);
+
+    field_info_t* field_info = terms_enum->field_reader->field_info;
+    block_term_state_t* state = terms_enum->current_frame->state;
+
+    bool index_has_positions = compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
+
+    if (!index_has_positions || ((flags & POSTINGS_ENUM_POSITIONS) == 0)) {
+        // todo no reuse
+
+        postings_enum_t* postings_enum = allocation_get(sizeof(*postings_enum));
+
+        postings_enum->start_doc_in = doc_in;
+        postings_enum->doc_in = NULL;
+
+        postings_enum->index_has_freq = compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS) >= 0;
+        postings_enum->index_has_pos = compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
+        postings_enum->index_has_offsets = compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0;
+        postings_enum->index_has_payloads = field_info->store_payloads;
+        postings_enum->encoded = allocation_get(MAX_ENCODED_SIZE);
+
+        postings_enum->for_util = for_util;
+
+        initialize_max_data_size();
+
+        postings_enum->freq_buffer = allocation_get(MAX_DATA_SIZE * sizeof(*(postings_enum->freq_buffer)));
+        postings_enum->doc_delta_buffer = allocation_get(MAX_DATA_SIZE * sizeof(*(postings_enum->doc_delta_buffer)));
+
+        return postings_enum_reset(postings_enum, state, flags);
+    } else {
+        // todo not implemented
+        fprintf(stderr, "impacts not implemented\n");
+        exit(1);
+    }
+}
+
+static postings_enum_t* postings_enum_reset(postings_enum_t* postings_enum, block_term_state_t* state, uint32_t flags) {
+    postings_enum->doc_freq = state->doc_freq;
+    postings_enum->total_term_freq = (uint64_t) (postings_enum->index_has_freq ? state->total_term_freq : postings_enum->doc_freq);
+    postings_enum->doc_term_start_fp = state->doc_start_fp;
+    postings_enum->skip_offset = state->skip_offset;
+    postings_enum->singleton_doc_id = state->singleton_doc_id;
+    if (postings_enum->doc_freq > 1) {
+        if (postings_enum->doc_in == NULL) {
+            postings_enum->doc_in = data_input_clone(postings_enum->start_doc_in);
+        }
+        postings_enum->doc_in->index = (uint32_t) postings_enum->doc_term_start_fp;
+    }
+
+    postings_enum->doc = -1;
+    postings_enum->needs_freq = (flags & POSTINGS_ENUM_FREQS) != 0;
+    if (!postings_enum->index_has_freq || !postings_enum->needs_freq) {
+        for (int i = 0; i < MAX_DATA_SIZE; ++i) {
+            postings_enum->freq_buffer[i] = 1;
+        }
+    }
+    postings_enum->accum = 0;
+    postings_enum->doc_up_to = 0;
+    postings_enum->next_skip_doc = BLOCK_SIZE - 1;
+    postings_enum->doc_buffer_up_to = BLOCK_SIZE;
+    postings_enum->skipped = false;
+
+    return postings_enum;
+}
+
+int32_t postings_next_doc(postings_enum_t* postings_enum) {
+    if (postings_enum->doc_up_to == postings_enum->doc_freq) {
+        return postings_enum->doc = NO_MORE_DOCS;
+    }
+    if (postings_enum->doc_buffer_up_to == BLOCK_SIZE) {
+        postings_refill_docs(postings_enum);
+    }
+
+    postings_enum->accum += postings_enum->doc_delta_buffer[postings_enum->doc_buffer_up_to];
+    postings_enum->doc_up_to++;
+    postings_enum->doc = postings_enum->accum;
+    postings_enum->freq = postings_enum->freq_buffer[postings_enum->doc_buffer_up_to];
+    postings_enum->doc_buffer_up_to++;
+    return postings_enum->doc;
+}
+
+int32_t postings_advance(postings_enum_t* postings_enum, uint32_t target) {
+    int32_t doc;
+
+    while ((doc = postings_next_doc(postings_enum)) < target) {}
+
+    return doc;
+}
+
+static void postings_refill_docs(postings_enum_t* postings_enum) {
+    uint32_t left = postings_enum->doc_freq - postings_enum->doc_up_to;
+
+    if (left >= BLOCK_SIZE) {
+        read_block(postings_enum->doc_in, postings_enum->for_util, postings_enum->encoded, postings_enum->doc_delta_buffer);
+
+        if (postings_enum->index_has_freq) {
+            if (postings_enum->needs_freq) {
+                read_block(postings_enum->doc_in, postings_enum->for_util, postings_enum->encoded, postings_enum->freq_buffer);
+            } else {
+                skip_block(postings_enum->doc_in, postings_enum->for_util);
+            }
+        }
+    } else if (postings_enum->doc_freq == 1) {
+        postings_enum->doc_delta_buffer[0] = postings_enum->singleton_doc_id;
+        postings_enum->freq_buffer[0] = (int32_t) postings_enum->total_term_freq;
+    } else {
+        read_vint_block(postings_enum->doc_in, postings_enum->doc_delta_buffer, postings_enum->freq_buffer, left, postings_enum->index_has_freq);
+    }
+
+    postings_enum->doc_buffer_up_to = 0;
+}
+
+static void read_block(data_input_t* in, for_util_t* for_util, uint8_t* encoded, int32_t* decoded) {
+    uint32_t num_bits = in->read_byte(in);
+
+    if (num_bits == ALL_VALUES_EQUAL) {
+        int32_t value = read_vint(in);
+        for (int i = 0; i < BLOCK_SIZE; ++i) {
+            decoded[i] = value;
+        }
+        return;
+    }
+
+    uint32_t encoded_size = for_util->encoded_sizes[num_bits];
+    read_bytes(in, encoded, 0, encoded_size);
+
+    packed_int_decoder_t* decoder = for_util->decoders + num_bits;
+    uint32_t iters = for_util->iterations[num_bits];
+
+    decode(decoder, encoded, 0, decoded, 0, iters);
+}
+
+static void skip_block(data_input_t* in, for_util_t* for_util) {
+    uint32_t num_bits = in->read_byte(in);
+
+    if (num_bits == ALL_VALUES_EQUAL) {
+        read_vint(in);
+        return;
+    }
+
+    uint32_t encoded_size = for_util->encoded_sizes[num_bits];
+    in->index += encoded_size;
+}
+
+static void read_vint_block(data_input_t* doc_in, int32_t* doc_buffer, int32_t* freq_buffer, uint32_t num, bool index_has_freq) {
+    if (index_has_freq) {
+        for(int i = 0; i < num; i++) {
+            uint32_t code = read_vint(doc_in);
+            doc_buffer[i] = code >> 1;
+            if ((code & 1) != 0) {
+                freq_buffer[i] = 1;
+            } else {
+                freq_buffer[i] = read_vint(doc_in);
+            }
+        }
+    } else {
+        for(int i = 0; i < num; i++) {
+            doc_buffer[i] = read_vint(doc_in);
+        }
+    }
+}
+
+static void decode(packed_int_decoder_t* decoder, uint8_t* blocks, uint32_t blocks_offset, int32_t* values, uint32_t values_offset, uint32_t iterations) {
+    int32_t next_value = 0;
+    uint32_t bits_left = decoder->bits_per_value;
+    for (int i = 0; i < iterations * decoder->byte_block_count; ++i) {
+        uint32_t bytes = (uint32_t) (blocks[blocks_offset++] & 0xFF);
+        if (bits_left > 8) {
+            // just buffer
+            bits_left -= 8;
+            next_value |= bytes << bits_left;
+        } else {
+            // flush
+            int bits = 8 - bits_left;
+            values[values_offset++] = next_value | (bytes >> bits);
+            while (bits >= decoder->bits_per_value) {
+                bits -= decoder->bits_per_value;
+                values[values_offset++] = (bytes >> bits) & decoder->int_mask;
+            }
+            // then buffer
+            bits_left = decoder->bits_per_value - bits;
+            next_value = (bytes & ((1 << bits) - 1)) << bits_left;
+        }
+    }
+}
+
+static void initialize_max_data_size(for_util_t* for_util) {
+    if (MAX_DATA_SIZE == 0xFFFFFFFF) {
+        // todo simplified (one version, one packed_ints format)
+        uint32_t max_data_size = 0;
+        for (int i = 1; i <= 32; ++i) {
+            packed_int_decoder_t* decoder = for_util->decoders + i;
+            uint32_t iterations = (uint32_t) math_ceil((float) BLOCK_SIZE / decoder->byte_value_count);
+            max_data_size = math_max(max_data_size, iterations * decoder->byte_value_count);
+        }
+
+        MAX_DATA_SIZE = max_data_size;
     }
 }
