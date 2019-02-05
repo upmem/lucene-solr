@@ -3,6 +3,8 @@
  */
 
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "data_input.h"
 #include "allocation.h"
 
@@ -10,6 +12,10 @@ data_input_t *data_input_clone(data_input_t *from) {
     data_input_t *result = allocation_get(sizeof(*result));
     memcpy(result, from, sizeof(*from));
     return result;
+}
+
+void set_index(data_input_t* input, uint32_t index) {
+    input->index = index;
 }
 
 void read_bytes(data_input_t *input, uint8_t *dest, uint32_t offset, uint32_t length) {

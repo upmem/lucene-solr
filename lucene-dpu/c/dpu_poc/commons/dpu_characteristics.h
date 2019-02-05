@@ -1,0 +1,10 @@
+/*
+ * Copyright (c) 2014-2019 - uPmem
+ */
+
+#ifndef DPU_POC_DPU_CHARACTERISTICS_H
+#define DPU_POC_DPU_CHARACTERISTICS_H
+
+#define NR_THREADS 1
+
+#endif //DPU_POC_DPU_CHARACTERISTICS_H

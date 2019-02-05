@@ -58,7 +58,7 @@ static field_reader_t *field_reader_new(block_tree_term_reader_t *parent,
 
     if (index_in != NULL) {
         data_input_t *clone = data_input_clone(index_in);
-        clone->index = (uint32_t) index_start_fp;
+        set_index(clone, (uint32_t) index_start_fp);
         reader->index = fst_new(clone);
     } else {
         reader->index = NULL;
@@ -145,9 +145,9 @@ parse_fields_details(field_infos_t *field_infos, data_input_t *terms_in, uint32_
 }
 
 static void seek_dir(data_input_t *in, uint32_t in_length) {
-    in->index = in_length - sizeof(lucene_codec_footer_t) - 8;
+    set_index(in, in_length - sizeof(lucene_codec_footer_t) - 8);
     uint64_t offset = read_long(in);
-    in->index = (uint32_t) offset;
+    set_index(in, (uint32_t) offset);
 }
 
 static bytes_ref_t *read_bytes_ref(data_input_t *terms_in) {

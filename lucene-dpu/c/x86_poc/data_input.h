@@ -28,6 +28,8 @@ typedef struct {
 
 data_input_t *data_input_clone(data_input_t *from);
 
+void set_index(data_input_t* input, uint32_t index);
+
 void read_bytes(struct _data_input_t *self, uint8_t *dest, uint32_t offset, uint32_t length);
 
 uint16_t read_short(data_input_t *input);

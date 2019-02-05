@@ -469,7 +469,7 @@ static void load_block(segment_terms_enum_frame_t *frame) {
         return;
     }
 
-    frame->ste->in->index = (uint32_t) frame->fp;
+    set_index(frame->ste->in, (uint32_t) frame->fp);
     uint32_t code = read_vint(frame->ste->in);
     frame->ent_count = code >> 1;
     frame->is_last_in_floor = (code & 1) != 0;

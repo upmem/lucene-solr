@@ -170,7 +170,7 @@ static inline arc_t *_find_target_arc(fst_t *fst, int32_t label_to_match, arc_t 
         return NULL;
     }
 
-    in->index = (uint32_t) follow->target;
+    set_index(in, (uint32_t) follow->target);
 
     if (in->read_byte(in) == ARCS_AS_FIXED_ARRAY) {
         arc->num_arcs = read_vint(in);
@@ -180,7 +180,7 @@ static inline arc_t *_find_target_arc(fst_t *fst, int32_t label_to_match, arc_t 
         uint32_t high = (uint32_t) (arc->num_arcs - 1);
         while (low <= high) {
             uint32_t mid = (low + high) >> 1;
-            in->index = (uint32_t) arc->pos_arcs_start;
+            set_index(in, (uint32_t) arc->pos_arcs_start);
             in->skip_bytes(in, arc->bytes_per_arc * mid + 1);
             int32_t mid_label = read_label(fst, in);
             int32_t cmp = mid_label - label_to_match;
@@ -252,7 +252,7 @@ static int32_t read_label(fst_t *fst, data_input_t *in) {
 }
 
 static arc_t *read_first_real_target_arc(fst_t *fst, int64_t address, arc_t *arc, data_input_t *in) {
-    in->index = (uint32_t) address;
+    set_index(in, (uint32_t) address);
 
     if (in->read_byte(in) == ARCS_AS_FIXED_ARRAY) {
         arc->num_arcs = read_vint(in);
@@ -270,10 +270,10 @@ static arc_t *read_first_real_target_arc(fst_t *fst, int64_t address, arc_t *arc
 static arc_t *read_next_real_arc(fst_t *fst, arc_t *arc, data_input_t *in) {
     if (arc->bytes_per_arc != 0) {
         arc->arc_idx++;
-        in->index = (uint32_t) arc->pos_arcs_start;
+        set_index(in, (uint32_t) arc->pos_arcs_start);
         in->skip_bytes(in, (uint32_t) (arc->arc_idx * arc->bytes_per_arc));
     } else {
-        in->index = (uint32_t) arc->next_arc;
+        set_index(in, (uint32_t) arc->next_arc);
     }
 
     arc->flags = in->read_byte(in);
@@ -304,7 +304,7 @@ static arc_t *read_next_real_arc(fst_t *fst, arc_t *arc, data_input_t *in) {
             if (arc->bytes_per_arc == 0) {
                 seek_to_next_node(fst, in);
             } else {
-                in->index = (uint32_t) arc->pos_arcs_start;
+                set_index(in, (uint32_t) arc->pos_arcs_start);
                 in->skip_bytes(in, (uint32_t) (arc->bytes_per_arc * arc->num_arcs));
             }
         }
