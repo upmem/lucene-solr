@@ -111,8 +111,8 @@ static void generate_file_buffers_from_cfs(mram_addr_t cfe_offset, mram_addr_t c
 static lucene_file_e extension_to_index(uint8_t *file_name) {
     unsigned int each;
     for (each = 0; each < LUCENE_FILE_ENUM_LENGTH; each++) {
-        size_t file_name_size = strlen(file_name);
-        if (!strncmp(&file_name[file_name_size - 3], &lucene_file_extension[each][1], 3))
+        size_t file_name_size = strlen((const char *)file_name);
+        if (!strncmp((const char *)&file_name[file_name_size - 3], &lucene_file_extension[each][1], 3))
             return each;
     }
     abort();

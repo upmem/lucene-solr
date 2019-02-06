@@ -10,10 +10,10 @@ index_header_t *read_index_header(mram_reader_t *buffer) {
     index_header_t *index_header = malloc(sizeof(index_header_t));
 
     index_header->magic = mram_read_int(buffer, false);
-    index_header->codec_name = mram_read_string(buffer, &unused_length, false);
+    index_header->codec_name = (uint8_t *)mram_read_string(buffer, &unused_length, false);
     index_header->version = mram_read_int(buffer, false);
 
-    mram_read_bytes(buffer, index_header->object_id, 0, LUCENE_INDEX_HEADER_OBJECTID_SIZE, false);
+    mram_read_bytes(buffer, (uint8_t *)index_header->object_id, 0, LUCENE_INDEX_HEADER_OBJECTID_SIZE, false);
 
     index_header->suffix_length = mram_read_byte(buffer, false);
     index_header->suffix_bytes = malloc(index_header->suffix_length * sizeof(uint8_t));

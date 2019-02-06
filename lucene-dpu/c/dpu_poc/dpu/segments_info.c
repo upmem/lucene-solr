@@ -41,14 +41,14 @@ segments_info_t *parse_segments_info(mram_addr_t offset) {
     for (each = 0; each < segments_info->DiagnosticsCount; each++) {
         segments_info->Diagnostics[each] = (uint8_t **) malloc(2 * sizeof(uint8_t *));
 
-        segments_info->Diagnostics[each][0] = mram_read_string(&buffer, &unused_length, false);
-        segments_info->Diagnostics[each][1] = mram_read_string(&buffer, &unused_length, false);
+        segments_info->Diagnostics[each][0] = (uint8_t *)mram_read_string(&buffer, &unused_length, false);
+        segments_info->Diagnostics[each][1] = (uint8_t *)mram_read_string(&buffer, &unused_length, false);
     }
 
     segments_info->FilesCount = mram_read_vint(&buffer, false);
     segments_info->Files = (uint8_t **) malloc(segments_info->FilesCount * sizeof(uint8_t *));
     for (each = 0; each < segments_info->FilesCount; each++) {
-        segments_info->Files[each] = mram_read_string(&buffer, &unused_length, false);
+        segments_info->Files[each] = (uint8_t *)mram_read_string(&buffer, &unused_length, false);
     }
 
     segments_info->AttributesCount = mram_read_vint(&buffer, false);
@@ -56,8 +56,8 @@ segments_info_t *parse_segments_info(mram_addr_t offset) {
     for (each = 0; each < segments_info->AttributesCount; each++) {
         segments_info->Attributes[each] = (uint8_t **) malloc(2 * sizeof(uint8_t *));
 
-        segments_info->Attributes[each][0] = mram_read_string(&buffer, &unused_length, false);
-        segments_info->Attributes[each][1] = mram_read_string(&buffer, &unused_length, false);
+        segments_info->Attributes[each][0] = (uint8_t *)mram_read_string(&buffer, &unused_length, false);
+        segments_info->Attributes[each][1] = (uint8_t *)mram_read_string(&buffer, &unused_length, false);
     }
 
     segments_info->NumSortFields = mram_read_vint(&buffer, false);
