@@ -7,5 +7,5 @@ set(CMAKE_C_STANDARD 11)
 
 file(GLOB SOURCES *.c)
 
-dpu_build_bootstrap(__bootstrap.s SCRIPT config.kconf)
-add_executable(dpu __bootstrap.s ${SOURCES})
+dpu_build_bootstrap(__bootstrap.S SCRIPT config.kconf)
+add_executable(dpu __bootstrap.S ${SOURCES})
