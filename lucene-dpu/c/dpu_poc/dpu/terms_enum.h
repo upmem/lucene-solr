@@ -9,6 +9,7 @@
 #include "term_reader.h"
 #include "fst.h"
 #include "terms_enum_frame.h"
+#include "term_state.h"
 
 typedef struct _terms_enum_frame_t terms_enum_frame_t;
 
@@ -39,5 +40,7 @@ bool seek_exact(terms_enum_t *terms_enum, bytes_ref_t *target);
 void init_index_input(terms_enum_t *terms_enum);
 
 terms_enum_frame_t *push_frame_fp(terms_enum_t *terms_enum, arc_t *arc, uint64_t fp, uint32_t length);
+
+term_state_t *get_term_state(terms_enum_t *terms_enum);
 
 #endif //DPU_POC_TERMS_ENUM_H
