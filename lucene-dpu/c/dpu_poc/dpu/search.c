@@ -19,6 +19,8 @@ void search(search_context_t *ctx, terms_enum_t *terms_enum, char* field, char *
 
     if (seek_exact(terms_enum, bytes_ref_from_string(value))) {
         term_state_t *term_state = get_term_state(terms_enum);
+        int32_t doc_freq = get_doc_freq(terms_enum);
+        int64_t total_term_freq = get_total_term_freq(terms_enum);
         // todo
         abort();
     }

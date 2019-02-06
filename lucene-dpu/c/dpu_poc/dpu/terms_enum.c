@@ -307,3 +307,13 @@ term_state_t *get_term_state(terms_enum_t *terms_enum) {
     memcpy(result, terms_enum->current_frame->state, sizeof(*result));
     return result;
 }
+
+int32_t get_doc_freq(terms_enum_t *terms_enum) {
+    decode_metadata(terms_enum->current_frame);
+    return terms_enum->current_frame->state->doc_freq;
+}
+
+int64_t get_total_term_freq(terms_enum_t *terms_enum) {
+    decode_metadata(terms_enum->current_frame);
+    return terms_enum->current_frame->state->total_term_freq;
+}

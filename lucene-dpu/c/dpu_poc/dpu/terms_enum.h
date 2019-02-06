@@ -43,4 +43,8 @@ terms_enum_frame_t *push_frame_fp(terms_enum_t *terms_enum, arc_t *arc, uint64_t
 
 term_state_t *get_term_state(terms_enum_t *terms_enum);
 
+int32_t get_doc_freq(terms_enum_t *terms_enum);
+
+int64_t get_total_term_freq(terms_enum_t *terms_enum);
+
 #endif //DPU_POC_TERMS_ENUM_H
