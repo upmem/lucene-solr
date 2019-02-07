@@ -11,6 +11,7 @@
 #include "terms_enum.h"
 #include "query.h"
 #include "for_util.h"
+#include "norms.h"
 
 typedef struct {
     file_buffer_t file_buffers[LUCENE_FILE_ENUM_LENGTH];
@@ -18,6 +19,7 @@ typedef struct {
     field_infos_t *field_infos;
     mram_reader_t *doc_reader;
     for_util_t *for_util;
+    norms_reader_t *norms_reader;
 } search_context_t;
 
 search_context_t *initialize_context(uint32_t index);

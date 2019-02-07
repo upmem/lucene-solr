@@ -7,6 +7,7 @@
 
 #include <defs.h>
 
+#include "norms.h"
 #include "context.h"
 #include "mram_access.h"
 #include "../commons/mram_structure.h"
@@ -60,6 +61,27 @@ static mram_reader_t *build_doc_reader(file_buffer_t *file_buffers) {
     return doc_reader;
 }
 
+static norms_reader_t *build_norms_reader(search_context_t *ctx) {
+    field_infos_t *field_infos = ctx->field_infos;
+
+    file_buffer_t *buffer_norms_data = ctx->file_buffers + LUCENE_FILE_NVD;
+    file_buffer_t *buffer_norms_metadata = ctx->file_buffers + LUCENE_FILE_NVM;
+
+    mram_reader_t *norms_data = malloc(sizeof(*norms_data));
+    norms_data->index = 0;
+    norms_data->base = buffer_norms_data->offset;
+    norms_data->cache = mram_cache_for(me());
+
+    mram_reader_t *norms_metadata = malloc(sizeof(*norms_metadata));
+    norms_metadata->index = 0;
+    norms_metadata->base = buffer_norms_metadata->offset;
+    norms_metadata->cache = mram_cache_for(me());
+
+    return norms_reader_new(norms_metadata, buffer_norms_metadata->length,
+                            norms_data, buffer_norms_data->length,
+                            field_infos);
+}
+
 search_context_t *initialize_context(uint32_t index) {
     search_context_t* context = contexts + index;
 
@@ -83,6 +105,7 @@ search_context_t *initialize_context(uint32_t index) {
     context->term_reader = build_fields_producer(context);
     context->doc_reader = build_doc_reader(context->file_buffers);
     context->for_util = build_for_util(context->doc_reader);
+    context->norms_reader = build_norms_reader(context);
 
     return context;
 }

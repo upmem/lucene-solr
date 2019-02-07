@@ -3,6 +3,9 @@
  */
 
 #include <stdlib.h>
+
+#include <ktrace.h>
+
 #include "search.h"
 #include "term_reader.h"
 #include "term_scorer.h"
@@ -29,6 +32,12 @@ void search(search_context_t *ctx, terms_enum_t *terms_enum, char* field, char *
 
         int32_t doc;
         while ((doc = postings_next_doc(scorer->postings_enum)) != NO_MORE_DOCS) {
+            float score = compute_score(field_reader->doc_count,
+                                        (uint32_t) doc_freq,
+                                        scorer->postings_enum->freq,
+                                        getNorms(ctx->norms_reader, field_reader->field_info->number, doc),
+                                        field_reader->sum_total_term_freq);
+            ktrace("doc:%d freq:%d score:%f\n", doc, scorer->postings_enum->freq, score);
         }
     }
 }
