@@ -14,7 +14,7 @@
 #define DPU_BINARY_PATH STR(DPU_BINARY)
 
 #define DPU_TYPE FUNCTIONAL_SIMULATOR
-#define DPU_PROFILE ""
+#define DPU_PROFILE "iramSize=8192"
 
 int main(int argc, char **argv) {
     if (argc != 3) {
@@ -47,6 +47,11 @@ int main(int argc, char **argv) {
     free_segment_files(segment_files);
 
     search(dpu_system, "contents", "apache", true);
+//    search(dpu_system, "contents", "patent", true);
+//    search(dpu_system, "contents", "lucene", true);
+//    search(dpu_system, "contents", "gnu", true);
+//    search(dpu_system, "contents", "derivative", true);
+//    search(dpu_system, "contents", "license", true);
 
     free_dpu_system(dpu_system);
 

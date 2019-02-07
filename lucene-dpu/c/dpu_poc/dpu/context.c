@@ -54,7 +54,7 @@ static mram_reader_t *build_doc_reader(file_buffer_t *file_buffers) {
     file_buffer_t *docs = file_buffers + LUCENE_FILE_DOC;
 
     mram_reader_t *doc_reader = malloc(sizeof(*doc_reader));
-    doc_reader->index = 0;
+    doc_reader->index = docs->offset;
     doc_reader->base = docs->offset;
     doc_reader->cache = mram_cache_for(me());
 
@@ -69,12 +69,12 @@ static norms_reader_t *build_norms_reader(search_context_t *ctx) {
     file_buffer_t *buffer_norms_metadata = ctx->file_buffers + LUCENE_FILE_NVM;
 
     mram_reader_t *norms_data = malloc(sizeof(*norms_data));
-    norms_data->index = 0;
+    norms_data->index = buffer_norms_data->offset;
     norms_data->base = buffer_norms_data->offset;
     norms_data->cache = mram_cache_for(me());
 
     mram_reader_t *norms_metadata = malloc(sizeof(*norms_metadata));
-    norms_metadata->index = 0;
+    norms_metadata->index = buffer_norms_metadata->offset;
     norms_metadata->base = buffer_norms_metadata->offset;
     norms_metadata->cache = mram_cache_for(me());
 

@@ -61,7 +61,8 @@ for_util_t *build_for_util(mram_reader_t *doc_reader) {
                 // PACKED: ok
                 break;
             default:
-                abort();
+                for_util->setup_done[i] = false;
+                continue;
         }
 
         for_util->encoded_sizes[i] = encoded_size(bits_per_value);

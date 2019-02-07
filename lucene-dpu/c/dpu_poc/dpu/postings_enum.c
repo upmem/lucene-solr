@@ -39,7 +39,7 @@ static postings_enum_t *postings_enum_reset(postings_enum_t *postings_enum, term
         if (postings_enum->doc_in == NULL) {
             postings_enum->doc_in = mram_reader_clone(postings_enum->start_doc_in);
         }
-        postings_enum->doc_in->index = (uint32_t) postings_enum->doc_term_start_fp;
+        set_index(postings_enum->doc_in, (uint32_t) postings_enum->doc_term_start_fp);
     }
 
     postings_enum->doc = -1;
