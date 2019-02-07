@@ -11,6 +11,8 @@
 #include "terms_enum_frame.h"
 #include "term_state.h"
 
+#define BLOCK_SIZE 128
+
 typedef struct _terms_enum_frame_t terms_enum_frame_t;
 
 typedef struct _terms_enum_t {

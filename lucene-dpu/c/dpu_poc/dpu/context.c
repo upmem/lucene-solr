@@ -4,6 +4,9 @@
 
 #include <stdlib.h>
 #include <string.h>
+
+#include <defs.h>
+
 #include "context.h"
 #include "mram_access.h"
 #include "../commons/mram_structure.h"
@@ -45,6 +48,18 @@ static void generate_file_buffers_from_cfs(mram_addr_t cfe_offset, mram_addr_t c
 static lucene_file_e extension_to_index(uint8_t *file_name);
 static term_reader_t *build_fields_producer(search_context_t *ctx);
 
+static mram_reader_t *build_doc_reader(file_buffer_t *file_buffers) {
+    file_buffer_t *docs = file_buffers + LUCENE_FILE_DOC;
+
+    mram_reader_t *doc_reader = malloc(sizeof(*doc_reader));
+    doc_reader->index = 0;
+    doc_reader->base = docs->offset;
+    doc_reader->cache = mram_cache_for(me());
+
+    check_index_header(doc_reader);
+    return doc_reader;
+}
+
 search_context_t *initialize_context(uint32_t index) {
     search_context_t* context = contexts + index;
 
@@ -66,6 +81,8 @@ search_context_t *initialize_context(uint32_t index) {
 
     context->field_infos = read_field_infos(context->file_buffers + LUCENE_FILE_FNM);
     context->term_reader = build_fields_producer(context);
+    context->doc_reader = build_doc_reader(context->file_buffers);
+    context->for_util = build_for_util(context->doc_reader);
 
     return context;
 }

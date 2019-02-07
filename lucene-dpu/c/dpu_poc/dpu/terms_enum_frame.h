@@ -83,4 +83,6 @@ void load_block(terms_enum_frame_t *frame);
 
 seek_status_t scan_to_term(terms_enum_frame_t *frame, bytes_ref_t *target, bool exact_only);
 
+void decode_metadata(terms_enum_frame_t *frame);
+
 #endif //DPU_POC_TERMS_ENUM_FRAME_H

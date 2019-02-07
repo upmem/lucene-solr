@@ -13,6 +13,70 @@ static bool next_frame_entry(terms_enum_frame_t *frame);
 static void next_frame_leaf(terms_enum_frame_t *frame);
 static bool next_frame_non_leaf(terms_enum_frame_t *frame);
 
+static void decode_term(int64_t *longs,
+                        wram_reader_t *in,
+                        field_info_t *field_info,
+                        term_state_t *state,
+                        bool absolute) {
+    bool field_has_positions =
+            compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
+    bool field_has_offsets =
+            compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0;
+    bool field_has_payloads = field_info->store_payloads;
+
+    if (absolute) {
+        state->doc_start_fp = 0;
+        state->pos_start_fp = 0;
+        state->pay_start_fp = 0;
+    }
+
+    state->doc_start_fp += longs[0];
+    if (field_has_positions) {
+        state->pos_start_fp += longs[1];
+        if (field_has_offsets || field_has_payloads) {
+            state->pay_start_fp += longs[2];
+        }
+    }
+    if (state->doc_freq == 1) {
+        state->singleton_doc_id = wram_read_vint(in);
+    } else {
+        state->singleton_doc_id = -1;
+    }
+    if (field_has_positions) {
+        if (state->total_term_freq > BLOCK_SIZE) {
+            state->last_pos_block_offset = wram_read_vlong(in);
+        } else {
+            state->last_pos_block_offset = -1;
+        }
+    }
+    if (state->doc_freq > BLOCK_SIZE) {
+        state->skip_offset = wram_read_vlong(in);
+    } else {
+        state->skip_offset = -1;
+    }
+}
+
+void decode_metadata(terms_enum_frame_t *frame) {
+    int32_t limit = frame->is_leaf_block ? frame->next_ent : frame->state->term_block_ord;
+    bool absolute = frame->metadata_up_to == 0;
+
+    while (frame->metadata_up_to < limit) {
+        frame->state->doc_freq = wram_read_vint(frame->stats_reader);
+        if (frame->ste->field_reader->field_info->index_options == INDEX_OPTIONS_DOCS) {
+            frame->state->total_term_freq = frame->state->doc_freq;
+        } else {
+            frame->state->total_term_freq = frame->state->doc_freq + wram_read_vlong(frame->stats_reader);
+        }
+        for (int i = 0; i < frame->ste->field_reader->longs_size; ++i) {
+            frame->longs[i] = wram_read_vlong(frame->bytes_reader);
+        }
+        decode_term(frame->longs, frame->bytes_reader, frame->ste->field_reader->field_info, frame->state, absolute);
+        frame->metadata_up_to++;
+        absolute = false;
+    }
+    frame->state->term_block_ord = frame->metadata_up_to;
+}
+
 terms_enum_frame_t *term_enum_frame_new(terms_enum_t *term_enum, int32_t ord) {
     terms_enum_frame_t *frame = malloc(sizeof(*frame));
 
