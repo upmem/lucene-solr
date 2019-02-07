@@ -7,11 +7,16 @@
 
 #include <stdint.h>
 
+#define MRAM_SIZE (1 << 26)
+
 #define QUERY_BUFFER_OFFSET 0
-#define QUERY_BUFFER_SIZE 16
+#define QUERY_BUFFER_SIZE 32
 
 #define FILES_SUMMARY_BUFFER_OFFSET QUERY_BUFFER_OFFSET + QUERY_BUFFER_SIZE
 #define FILES_SUMMARY_BUFFER_SIZE 16
 
+#define NR_FILES_OFFSETS 4
+
+#define DMA_ALIGNED(addr) (((addr) + 7) & ~7)
 
 #endif //DPU_POC_MRAM_STRUCTURE_H

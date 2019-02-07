@@ -5,8 +5,8 @@
 #ifndef DPU_POC_QUERY_H
 #define DPU_POC_QUERY_H
 
-#define MAX_FIELD_SIZE 8
-#define MAX_VALUE_SIZE 8
+#define MAX_FIELD_SIZE 16
+#define MAX_VALUE_SIZE 16
 
 typedef struct {
     char field[MAX_FIELD_SIZE];

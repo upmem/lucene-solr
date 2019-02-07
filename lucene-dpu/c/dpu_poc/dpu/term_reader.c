@@ -3,6 +3,7 @@
  */
 
 #include <stddef.h>
+#include <devprivate.h>
 #include <string.h>
 
 #include "term_reader.h"

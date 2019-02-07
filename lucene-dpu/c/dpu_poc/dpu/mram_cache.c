@@ -3,7 +3,7 @@
  */
 
 #include "mram_cache.h"
-#include "../commons/dpu_characteristics.h"
+#include "dpu_characteristics.h"
 
 mram_cache_t caches[NR_THREADS];
 
@@ -19,4 +19,8 @@ uint32_t update_mram_cache(mram_cache_t* cache, mram_addr_t mram_addr) {
 
 mram_cache_t *mram_cache_for(uint32_t task_id) {
     return caches + task_id;
+}
+
+mram_cache_t *mram_cache_init(uint32_t task_id) {
+    return caches[task_id].cached = 0xFFFFFFFF;
 }

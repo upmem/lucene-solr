@@ -5,7 +5,7 @@
 #include <mram.h>
 
 #include "mram_access.h"
-#include "../commons/mram_structure.h"
+#include "mram_structure.h"
 
 #define _CONCAT(x, y) x ## y
 #define MRAM_READ(to, from, length) _CONCAT(mram_read, length) (from, to)

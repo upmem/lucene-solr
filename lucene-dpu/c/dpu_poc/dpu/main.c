@@ -2,6 +2,7 @@
  * Copyright (c) 2014-2019 - uPmem
  */
 
+#include <devprivate.h>
 #include <defs.h>
 
 #include "context.h"
@@ -13,6 +14,7 @@ int main(void) {
     terms_enum_t *terms_enum;
     uint32_t task_id = me();
 
+    mram_cache_init(task_id);
     // initialize_context is long enough for task#0 to initialize the query before any other task needs it
     if (task_id == 0) {
         query = fetch_query(true);
@@ -22,8 +24,7 @@ int main(void) {
         query = fetch_query(false);
     }
 
-    terms_enum = initialize_terms_enum(task_id);
-    search(context, terms_enum, query->field, query->value);
+    search(context, query->field, query->value);
 
     return 0;
 }

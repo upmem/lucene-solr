@@ -2,6 +2,7 @@
  * Copyright (c) 2014-2019 - uPmem
  */
 
+#include <defs.h>
 #include <stdlib.h>
 #include "field_info.h"
 #include "mram_reader.h"
@@ -44,7 +45,8 @@ int32_t compare_index_options(index_options_t first, index_options_t second) {
 field_infos_t *read_field_infos(file_buffer_t *file) {
     mram_reader_t _input = {
             .index = file->offset,
-            .base = file->offset
+            .base = file->offset,
+            .cache = mram_cache_for(me())
     };
     mram_reader_t *input = &_input;
 

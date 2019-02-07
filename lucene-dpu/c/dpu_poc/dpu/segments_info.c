@@ -2,6 +2,7 @@
  * Copyright (c) 2014-2019 - uPmem
  */
 
+#include <defs.h>
 #include <stddef.h>
 #include "segments_info.h"
 #include "alloc_wrapper.h"
@@ -12,6 +13,7 @@ segments_info_t *parse_segments_info(mram_addr_t offset) {
     mram_reader_t buffer = {
             .index = offset,
             .base = offset,
+            .cache = mram_cache_for(me())
     };
     unsigned int each;
     uint32_t unused_length;

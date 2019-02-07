@@ -2,6 +2,8 @@
  * Copyright (c) 2014-2019 - uPmem
  */
 
+#include <defs.h>
+#include <devprivate.h>
 #include <stdlib.h>
 
 #include <ktrace.h>
@@ -11,10 +13,10 @@
 #include "term_scorer.h"
 #include "bytes_ref.h"
 
-void search(search_context_t *ctx, terms_enum_t *terms_enum, char* field, char *value) {
+void search(search_context_t *ctx, char* field, char *value) {
     term_t *term = term_from_string(field, value);
     field_reader_t *field_reader = fetch_field_reader(ctx->term_reader, field);
-    terms_enum->field_reader = field_reader;
+    terms_enum_t *terms_enum = initialize_terms_enum(me(), field_reader);
 
     if (field_reader->index == NULL) {
         terms_enum->fst_reader = NULL;

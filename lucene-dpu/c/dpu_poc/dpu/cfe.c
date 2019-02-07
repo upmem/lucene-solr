@@ -2,6 +2,7 @@
  * Copyright (c) 2014-2019 - uPmem
  */
 
+#include <defs.h>
 #include "cfe.h"
 #include "alloc_wrapper.h"
 
@@ -10,6 +11,7 @@ cfe_info_t *parse_cfe_info(mram_addr_t offset) {
     mram_reader_t buffer = {
             .index = offset,
             .base = offset,
+            .cache = mram_cache_for(me())
     };
     unsigned int each;
     uint32_t unused_length;

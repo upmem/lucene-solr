@@ -2,6 +2,7 @@
  * Copyright (c) 2014-2019 - uPmem
  */
 
+#include <defs.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -10,8 +11,8 @@
 #include "norms.h"
 #include "context.h"
 #include "mram_access.h"
-#include "../commons/mram_structure.h"
-#include "../commons/dpu_characteristics.h"
+#include "mram_structure.h"
+#include "dpu_characteristics.h"
 #include "segments_info.h"
 #include "cfe.h"
 #include "alloc_wrapper.h"
@@ -118,9 +119,10 @@ query_t *fetch_query(bool do_init) {
     return &the_query;
 }
 
-terms_enum_t *initialize_terms_enum(uint32_t index) {
+terms_enum_t *initialize_terms_enum(uint32_t index, field_reader_t *field_reader) {
     terms_enum_t *terms_enum = terms_enums + index;
 
+    terms_enum->field_reader = field_reader;
     terms_enum->in = NULL;
     terms_enum->stack = NULL;
     terms_enum->stack_length = 0;
@@ -165,13 +167,17 @@ static term_reader_t *build_fields_producer(search_context_t *ctx) {
     file_buffer_t *terms_dict = ctx->file_buffers + LUCENE_FILE_TIM;
     file_buffer_t *terms_index = ctx->file_buffers + LUCENE_FILE_TIP;
 
+    mram_cache_t* cache = mram_cache_for(me());
+
     mram_reader_t *terms_in = malloc(sizeof(*terms_in));
     terms_in->index = terms_dict->offset;
     terms_in->base = terms_dict->offset;
+    terms_in->cache = cache;
 
     mram_reader_t *index_in = malloc(sizeof(*index_in));
     index_in->index = terms_index->offset;
     index_in->base = terms_index->offset;
+    index_in->cache = cache;
 
     return term_reader_new(field_infos, terms_in, (uint32_t) terms_dict->length, index_in, (uint32_t) terms_index->length);
 }

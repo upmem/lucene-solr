@@ -4,6 +4,7 @@
 
 #include <stddef.h>
 #include <string.h>
+#include <devprivate.h>
 
 #include "mram_reader.h"
 #include "terms_enum.h"
@@ -28,7 +29,10 @@ bool seek_exact(terms_enum_t *terms_enum, bytes_ref_t *target) {
     bytes_ref_grow(terms_enum->term, 1 + target->length);
     terms_enum->target_before_current_length = terms_enum->current_frame->ord;
 
+    tell(terms_enum, "0");
+
     if (terms_enum->current_frame != terms_enum->static_frame) {
+        tell(terms_enum, "1");
         arc = &terms_enum->arcs[0];
         output = arc->output;
         target_up_to = 0;
@@ -39,58 +43,73 @@ bool seek_exact(terms_enum_t *terms_enum, bytes_ref_t *target) {
         int32_t cmp = 0;
 
         while (target_up_to < target_limit) {
+            tell(terms_enum, "2");
             cmp = (terms_enum->term->bytes[target_up_to] & 0xFF) -
                   (target->bytes[target->offset + target_up_to] & 0xFF);
 
             if (cmp != 0) {
+                tell(terms_enum, "3");
                 break;
             }
 
             arc = &terms_enum->arcs[1 + target_up_to];
 
             if (arc->output != &EMPTY_BYTES) {
+                tell(terms_enum, "4");
                 output = bytes_ref_add(output, arc->output);
             }
             if (arc_is_final(arc)) {
+                tell(terms_enum, "5");
                 last_frame = &terms_enum->stack[1 + last_frame->ord];
             }
             target_up_to++;
         }
 
+        tell(terms_enum, "6");
         if (cmp == 0) {
+            tell(terms_enum, "7");
             uint32_t target_up_to_mid = target_up_to;
 
             uint32_t target_limit_2 = min(target->length, terms_enum->term->length);
 
             while (target_up_to < target_limit_2) {
+                tell(terms_enum, "8");
                 cmp = (terms_enum->term->bytes[target_up_to] & 0xFF) -
                       (target->bytes[target->offset + target_up_to] & 0xFF);
 
                 if (cmp != 0) {
+                    tell(terms_enum, "9");
                     break;
                 }
                 target_up_to++;
             }
 
             if (cmp == 0) {
+                tell(terms_enum, "10");
                 cmp = terms_enum->term->length - target->length;
             }
 
             target_up_to = target_up_to_mid;
         }
 
+        tell(terms_enum, "11");
         if (cmp < 0) {
+            tell(terms_enum, "12");
             terms_enum->current_frame = last_frame;
         } else if (cmp > 0) {
+            tell(terms_enum, "13");
             terms_enum->target_before_current_length = last_frame->ord;
             terms_enum->current_frame = last_frame;
             rewind_frame(terms_enum->current_frame);
         } else {
+            tell(terms_enum, "14");
             if (terms_enum->term_exists) {
+                tell(terms_enum, "15");
                 return true;
             }
         }
     } else {
+        tell(terms_enum, "16");
         terms_enum->target_before_current_length = -1;
         arc = get_first_arc(terms_enum->field_reader->index, &terms_enum->arcs[0]);
         output = arc->output;
@@ -100,17 +119,24 @@ bool seek_exact(terms_enum_t *terms_enum, bytes_ref_t *target) {
                                                          0);
     }
 
+    tell(terms_enum, "17");
     while (target_up_to < target->length) {
+        tell(terms_enum, "18");
         uint32_t target_label = (uint32_t) (target->bytes[target->offset + target_up_to] & 0xFF);
 
         arc_t *next_arc = find_target_arc(terms_enum->field_reader->index, target_label, arc,
                                           get_arc(terms_enum, 1 + target_up_to), terms_enum->fst_reader);
 
+        tell(target_label, "0x1000");
+        tell(target_up_to, "0x1001");
+
         if (next_arc == NULL) {
+            tell(terms_enum, "19");
             terms_enum->valid_index_prefix = terms_enum->current_frame->prefix;
             scan_to_floor_frame(terms_enum->current_frame, target);
 
             if (!terms_enum->current_frame->has_terms) {
+                tell(terms_enum, "20");
                 terms_enum->term_exists = false;
                 terms_enum->term->bytes[target_up_to] = (uint8_t) target_label;
                 terms_enum->term->length = 1 + target_up_to;
@@ -120,32 +146,40 @@ bool seek_exact(terms_enum_t *terms_enum, bytes_ref_t *target) {
             load_block(terms_enum->current_frame);
             seek_status_t result = scan_to_term(terms_enum->current_frame, target, true);
 
+            tell(terms_enum, "21");
             if (result == SEEK_STATUS_FOUND) {
+                tell(terms_enum, "22");
                 return true;
             } else {
+                tell(terms_enum, "23");
                 return false;
             }
         } else {
+            tell(terms_enum, "24");
             arc = next_arc;
             terms_enum->term->bytes[target_up_to] = (uint8_t) target_label;
             if (arc->output != &EMPTY_BYTES) {
+                tell(terms_enum, "25");
                 output = bytes_ref_add(output, arc->output);
             }
 
             target_up_to++;
 
             if (arc_is_final(arc)) {
+                tell(terms_enum, "26");
                 terms_enum->current_frame = push_frame_bytes_ref(terms_enum, arc,
                                                                  bytes_ref_add(output, arc->next_final_output),
                                                                  target_up_to);
             }
         }
     }
+    tell(terms_enum, "27");
 
     terms_enum->valid_index_prefix = terms_enum->current_frame->prefix;
     scan_to_floor_frame(terms_enum->current_frame, target);
 
     if (!terms_enum->current_frame->has_terms) {
+        tell(terms_enum, "28");
         terms_enum->term_exists = false;
         terms_enum->term->length = target_up_to;
         return false;
@@ -154,9 +188,12 @@ bool seek_exact(terms_enum_t *terms_enum, bytes_ref_t *target) {
     load_block(terms_enum->current_frame);
     seek_status_t result = scan_to_term(terms_enum->current_frame, target, true);
 
+    tell(terms_enum, "29");
     if (result == SEEK_STATUS_FOUND) {
+        tell(terms_enum, "30");
         return true;
     } else {
+        tell(terms_enum, "31");
         return false;
     }
 }

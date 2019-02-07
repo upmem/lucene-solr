@@ -24,6 +24,6 @@ typedef struct {
 
 search_context_t *initialize_context(uint32_t index);
 query_t *fetch_query(bool do_init);
-terms_enum_t *initialize_terms_enum(uint32_t index);
+terms_enum_t *initialize_terms_enum(uint32_t index, field_reader_t *field_reader);
 
 #endif //DPU_POC_INIT_H

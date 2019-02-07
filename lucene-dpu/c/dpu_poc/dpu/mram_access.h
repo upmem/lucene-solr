@@ -5,11 +5,10 @@
 #ifndef DPU_POC_MRAM_ACCESS_H
 #define DPU_POC_MRAM_ACCESS_H
 
-#include "query.h"
+#include "../commons/query.h"
 #include <mram.h>
 
 #define MRAM_ACCESS_ALIGNMENT 8
-#define NR_FILES_OFFSETS 4
 #define CACHE_SIZE_LOG 7
 #define CACHE_SIZE 128
 

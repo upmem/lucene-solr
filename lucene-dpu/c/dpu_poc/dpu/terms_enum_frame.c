@@ -215,7 +215,7 @@ void load_block(terms_enum_frame_t *frame) {
     frame->bytes_reader->index = 0;
     frame->bytes_reader->buffer = frame->bytes;
 
-    frame->fp_end = frame->ste->in->index;
+    frame->fp_end = frame->ste->in->index - frame->ste->in->base;
 }
 
 seek_status_t scan_to_term(terms_enum_frame_t *frame, bytes_ref_t *target, bool exact_only) {
