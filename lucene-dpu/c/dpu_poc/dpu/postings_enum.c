@@ -6,6 +6,8 @@
 
 #define MAX_ENCODED_SIZE (BLOCK_SIZE * 4)
 
+#define ALL_VALUES_EQUAL 0
+
 static uint32_t MAX_DATA_SIZE = 0xFFFFFFFF;
 #define math_max(x, y) (((x) > (y)) ? (x) : (y))
 
@@ -95,4 +97,139 @@ postings_enum_t *impacts(terms_enum_t *terms_enum, uint32_t flags, mram_reader_t
         abort();
     }
 }
+
+static void decode(packed_int_decoder_t *decoder,
+                   uint8_t *blocks,
+                   uint32_t blocks_offset,
+                   int32_t *values,
+                   uint32_t values_offset,
+                   uint32_t iterations) {
+    int32_t next_value = 0;
+    uint32_t bits_left = decoder->bits_per_value;
+    for (int i = 0; i < iterations * decoder->byte_block_count; ++i) {
+        uint32_t bytes = (uint32_t) (blocks[blocks_offset++] & 0xFF);
+        if (bits_left > 8) {
+            // just buffer
+            bits_left -= 8;
+            next_value |= bytes << bits_left;
+        } else {
+            // flush
+            int bits = 8 - bits_left;
+            values[values_offset++] = next_value | (bytes >> bits);
+            while (bits >= decoder->bits_per_value) {
+                bits -= decoder->bits_per_value;
+                values[values_offset++] = (bytes >> bits) & decoder->int_mask;
+            }
+            // then buffer
+            bits_left = decoder->bits_per_value - bits;
+            next_value = (bytes & ((1 << bits) - 1)) << bits_left;
+        }
+    }
+}
+
+static void read_block(mram_reader_t *in, for_util_t *for_util, uint8_t *encoded, int32_t *decoded) {
+    uint32_t num_bits = mram_read_byte(in, false);
+
+    if (num_bits == ALL_VALUES_EQUAL) {
+        int32_t value = mram_read_vint(in, false);
+        for (int i = 0; i < BLOCK_SIZE; ++i) {
+            decoded[i] = value;
+        }
+        return;
+    }
+
+    if (!for_util->setup_done[num_bits]) {
+        abort();
+    }
+
+    uint32_t encoded_size = for_util->encoded_sizes[num_bits];
+    mram_read_bytes(in, encoded, 0, encoded_size, false);
+
+    packed_int_decoder_t *decoder = for_util->decoders + num_bits;
+    uint32_t iters = for_util->iterations[num_bits];
+
+    decode(decoder, encoded, 0, decoded, 0, iters);
+}
+
+static void skip_block(mram_reader_t *in, for_util_t *for_util) {
+    uint32_t num_bits = mram_read_byte(in, false);
+
+    if (num_bits == ALL_VALUES_EQUAL) {
+        mram_read_vint(in, false);
+        return;
+    }
+
+    if (!for_util->setup_done[num_bits]) {
+        abort();
+    }
+
+    uint32_t encoded_size = for_util->encoded_sizes[num_bits];
+    in->index += encoded_size;
+}
+
+static void read_vint_block(mram_reader_t *doc_in,
+                            int32_t *doc_buffer,
+                            int32_t *freq_buffer,
+                            uint32_t num,
+                            bool index_has_freq) {
+    if (index_has_freq) {
+        for (int i = 0; i < num; i++) {
+            uint32_t code = mram_read_vint(doc_in, false);
+            doc_buffer[i] = code >> 1;
+            if ((code & 1) != 0) {
+                freq_buffer[i] = 1;
+            } else {
+                freq_buffer[i] = mram_read_vint(doc_in, false);
+            }
+        }
+    } else {
+        for (int i = 0; i < num; i++) {
+            doc_buffer[i] = mram_read_vint(doc_in, false);
+        }
+    }
+}
+
+static void postings_refill_docs(postings_enum_t *postings_enum) {
+    uint32_t left = postings_enum->doc_freq - postings_enum->doc_up_to;
+
+    if (left >= BLOCK_SIZE) {
+        read_block(postings_enum->doc_in, postings_enum->for_util, postings_enum->encoded,
+                   postings_enum->doc_delta_buffer);
+
+        if (postings_enum->index_has_freq) {
+            if (postings_enum->needs_freq) {
+                read_block(postings_enum->doc_in, postings_enum->for_util, postings_enum->encoded,
+                           postings_enum->freq_buffer);
+            } else {
+                skip_block(postings_enum->doc_in, postings_enum->for_util);
+            }
+        }
+    } else if (postings_enum->doc_freq == 1) {
+        postings_enum->doc_delta_buffer[0] = postings_enum->singleton_doc_id;
+        postings_enum->freq_buffer[0] = (int32_t) postings_enum->total_term_freq;
+    } else {
+        read_vint_block(postings_enum->doc_in, postings_enum->doc_delta_buffer, postings_enum->freq_buffer, left,
+                        postings_enum->index_has_freq);
+    }
+
+    postings_enum->doc_buffer_up_to = 0;
+}
+
+int32_t postings_next_doc(postings_enum_t *postings_enum) {
+    if (postings_enum->doc_up_to == postings_enum->doc_freq) {
+        return postings_enum->doc = NO_MORE_DOCS;
+    }
+    if (postings_enum->doc_buffer_up_to == BLOCK_SIZE) {
+        postings_refill_docs(postings_enum);
+    }
+
+    postings_enum->accum += postings_enum->doc_delta_buffer[postings_enum->doc_buffer_up_to];
+    postings_enum->doc_up_to++;
+    postings_enum->doc = postings_enum->accum;
+    postings_enum->freq = postings_enum->freq_buffer[postings_enum->doc_buffer_up_to];
+    postings_enum->doc_buffer_up_to++;
+
+    return postings_enum->doc;
+}
+
 

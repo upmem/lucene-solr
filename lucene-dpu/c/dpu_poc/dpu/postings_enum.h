@@ -15,6 +15,8 @@
 #define POSTINGS_ENUM_FREQS (1 << 3)
 #define POSTINGS_ENUM_POSITIONS (1 << 4)
 
+#define NO_MORE_DOCS 0x7fffffff
+
 typedef struct {
     mram_reader_t *start_doc_in;
     mram_reader_t *doc_in;
@@ -47,5 +49,7 @@ typedef struct {
 } postings_enum_t;
 
 postings_enum_t *impacts(terms_enum_t *terms_enum, uint32_t flags, mram_reader_t *doc_reader, for_util_t *for_util);
+
+int32_t postings_next_doc(postings_enum_t *postings_enum);
 
 #endif /* __POSTINGS_ENUM_H__ */

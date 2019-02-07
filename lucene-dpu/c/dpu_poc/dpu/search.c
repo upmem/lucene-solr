@@ -26,7 +26,9 @@ void search(search_context_t *ctx, terms_enum_t *terms_enum, char* field, char *
 
         term_weight_t *weight = build_weight(term, SCORE_MODE_TOP_SCORES, term_state);
         term_scorer_t *scorer = build_scorer(weight, terms_enum, ctx->doc_reader, ctx->for_util);
-        // todo
-        abort();
+
+        int32_t doc;
+        while ((doc = postings_next_doc(scorer->postings_enum)) != NO_MORE_DOCS) {
+        }
     }
 }
