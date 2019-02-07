@@ -3,7 +3,6 @@
  */
 
 #include <defs.h>
-#include <devprivate.h>
 #include <stdlib.h>
 
 #include <ktrace.h>

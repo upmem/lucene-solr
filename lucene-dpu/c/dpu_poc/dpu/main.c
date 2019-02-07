@@ -2,7 +2,6 @@
  * Copyright (c) 2014-2019 - uPmem
  */
 
-#include <devprivate.h>
 #include <defs.h>
 
 #include "context.h"

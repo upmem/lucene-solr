@@ -21,6 +21,6 @@ mram_cache_t *mram_cache_for(uint32_t task_id) {
     return caches + task_id;
 }
 
-mram_cache_t *mram_cache_init(uint32_t task_id) {
-    return caches[task_id].cached = 0xFFFFFFFF;
+void mram_cache_init(uint32_t task_id) {
+    caches[task_id].cached = 0xFFFFFFFF;
 }

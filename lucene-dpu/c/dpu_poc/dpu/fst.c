@@ -3,7 +3,6 @@
  */
 
 #include <defs.h>
-#include <devprivate.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include "fst.h"
@@ -159,16 +158,11 @@ static arc_t *copy_arc_from(arc_t *arc, arc_t *other) {
 }
 
 static arc_t *_find_target_arc(fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, mram_reader_t *in, bool use_root_arc_cache) {
-    tell(arc, "0x2000");
     if (label_to_match == END_LABEL) {
-        tell(arc, "0x2001");
         if (arc_is_final(follow)) {
-            tell(arc, "0x2002");
             if (follow->target <= 0) {
-                tell(arc, "0x2003");
                 arc->flags = BIT_LAST_ARC;
             } else {
-                tell(arc, "0x2004");
                 arc->flags = 0;
                 arc->next_arc = follow->target;
             }
@@ -176,90 +170,63 @@ static arc_t *_find_target_arc(fst_t *fst, int32_t label_to_match, arc_t *follow
             arc->label = END_LABEL;
             return arc;
         } else {
-            tell(arc, "0x2005");
             return NULL;
         }
     }
 
-    tell(arc, "0x2006");
     if (use_root_arc_cache && (fst->cached_root_arcs != NULL) && (follow->target == fst->start_node) &&
         (label_to_match < fst->cached_root_arcs_length)) {
-        tell(arc, "0x2007");
         arc_t *result = fst->cached_root_arcs[label_to_match];
 
         if (result == NULL) {
-            tell(arc, "0x2008");
             return NULL;
         } else {
-            tell(arc, "0x2009");
             copy_arc_from(arc, result);
             return arc;
         }
     }
 
     if (follow->target <= 0) {
-        tell(arc, "0x2000A");
         return NULL;
     }
 
     set_index(in, (uint32_t) follow->target);
 
-    tell(arc, "0x2000B");
     if (mram_read_byte(in, true) == ARCS_AS_FIXED_ARRAY) {
-        tell(arc, "0x2000C");
         arc->num_arcs = mram_read_vint(in, true);
         arc->bytes_per_arc = mram_read_vint(in, true);
         arc->pos_arcs_start = in->index - in->base;
         uint32_t low = 0;
         uint32_t high = (uint32_t) (arc->num_arcs - 1);
-        tell(high, "0xE000");
-        tell(fst->input_type, "0xE001");
         while (low <= high) {
-            tell(arc, "0x2000D");
             uint32_t mid = (low + high) >> 1;
-            tell(arc->pos_arcs_start, "0xE002");
             set_index(in, (uint32_t) arc->pos_arcs_start);
             mram_skip_bytes(in, arc->bytes_per_arc * mid + 1, true);
-            tell(in->index, "0xE003");
-            tell(in->base, "0xE004");
             int32_t mid_label = read_label(fst, in);
-            tell(mid, "0xF000");
-            tell(label_to_match, "0xF001");
-            tell(mid_label, "0xF002");
             int32_t cmp = mid_label - label_to_match;
             if (cmp < 0) {
-                tell(arc, "0x2000E");
                 low = mid + 1;
             } else if (cmp > 0) {
-                tell(arc, "0x2000F");
                 high = mid - 1;
             } else {
-                tell(arc, "0x20010");
                 arc->arc_idx = mid - 1;
                 return read_next_real_arc(fst, arc, in);
             }
         }
 
-        tell(arc, "0x20011");
         return NULL;
     }
 
     read_first_real_target_arc(fst, follow->target, arc, in);
 
-    tell(arc, "0x20012");
     while (true) {
-        tell(arc, "0x20013");
         if (arc->label == label_to_match) {
-            tell(arc, "0x20014");
             return arc;
         } else if (arc->label > label_to_match) {
-            tell(arc, "0x20015");
             return NULL;
         } else if (arc_is_last(arc)) {
-            tell(arc, "0x20016");
             return NULL;
         } else {
-            tell(arc, "0x20017");
             read_next_real_arc(fst, arc, in);
         }
     }
