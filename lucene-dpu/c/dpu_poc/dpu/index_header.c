@@ -5,9 +5,8 @@
 #include "index_header.h"
 #include "alloc_wrapper.h"
 
-index_header_t *read_index_header(mram_reader_t *buffer) {
+void read_index_header(index_header_t *index_header, mram_reader_t *buffer) {
     uint32_t unused_length;
-    index_header_t *index_header = malloc(sizeof(index_header_t));
 
     index_header->magic = mram_read_int(buffer, false);
     index_header->codec_name = (uint8_t *)mram_read_string(buffer, &unused_length, false);
@@ -18,14 +17,13 @@ index_header_t *read_index_header(mram_reader_t *buffer) {
     index_header->suffix_length = mram_read_byte(buffer, false);
     index_header->suffix_bytes = malloc(index_header->suffix_length * sizeof(uint8_t));
     mram_read_bytes(buffer, index_header->suffix_bytes, 0, index_header->suffix_length, false);
-
-    return index_header;
 }
 
 uint32_t check_index_header(mram_reader_t *in) {
     // todo this function does not check anything, just read the expected bytes and returns the version
-    index_header_t *header = read_index_header(in);
-    uint32_t version = header->version;
+    index_header_t header;
+    read_index_header(&header, in);
+    uint32_t version = header.version;
     return version;
 }
 

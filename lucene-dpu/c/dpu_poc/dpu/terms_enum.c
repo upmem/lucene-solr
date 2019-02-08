@@ -2,6 +2,7 @@
  * Copyright (c) 2014-2019 - uPmem
  */
 
+#include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -11,6 +12,7 @@
 #include "math.h"
 #include "alloc_wrapper.h"
 #include "bytes_ref.h"
+#include "terms_enum_frame.h"
 
 #define OUTPUT_FLAGS_NUM_BITS 2
 #define OUTPUT_FLAG_IS_FLOOR 0x1
@@ -28,7 +30,7 @@ bool seek_exact(terms_enum_t *terms_enum, bytes_ref_t *target) {
     bytes_ref_grow(terms_enum->term, 1 + target->length);
     terms_enum->target_before_current_length = terms_enum->current_frame->ord;
 
-    if (terms_enum->current_frame != terms_enum->static_frame) {
+    if (terms_enum->current_frame != &terms_enum->static_frame) {
         arc = &terms_enum->arcs[0];
         output = arc->output;
         target_up_to = 0;
@@ -92,9 +94,9 @@ bool seek_exact(terms_enum_t *terms_enum, bytes_ref_t *target) {
         }
     } else {
         terms_enum->target_before_current_length = -1;
-        arc = get_first_arc(terms_enum->field_reader->index, &terms_enum->arcs[0]);
+        arc = get_first_arc(&terms_enum->field_reader->index, &terms_enum->arcs[0]);
         output = arc->output;
-        terms_enum->current_frame = terms_enum->static_frame;
+        terms_enum->current_frame = &terms_enum->static_frame;
         target_up_to = 0;
         terms_enum->current_frame = push_frame_bytes_ref(terms_enum, arc, bytes_ref_add(output, arc->next_final_output),
                                                          0);
@@ -103,8 +105,8 @@ bool seek_exact(terms_enum_t *terms_enum, bytes_ref_t *target) {
     while (target_up_to < target->length) {
         uint32_t target_label = (uint32_t) (target->bytes[target->offset + target_up_to] & 0xFF);
 
-        arc_t *next_arc = find_target_arc(terms_enum->field_reader->index, target_label, arc,
-                                          get_arc(terms_enum, 1 + target_up_to), terms_enum->fst_reader);
+        arc_t *next_arc = find_target_arc(&terms_enum->field_reader->index, target_label, arc,
+                                          get_arc(terms_enum, 1 + target_up_to), &terms_enum->fst_reader);
 
         if (next_arc == NULL) {
             terms_enum->valid_index_prefix = terms_enum->current_frame->prefix;
@@ -163,13 +165,12 @@ bool seek_exact(terms_enum_t *terms_enum, bytes_ref_t *target) {
 
 void init_index_input(terms_enum_t *terms_enum) {
     if (terms_enum->in == NULL) {
-        terms_enum->in = mram_reader_clone(terms_enum->field_reader->parent->terms_in);
+        terms_enum->in = mram_reader_clone(&terms_enum->field_reader->parent->terms_in);
     }
 }
 
-terms_enum_frame_t *push_frame_fp(terms_enum_t *terms_enum, arc_t *arc, uint64_t fp, uint32_t length) {
+terms_enum_frame_t *push_frame_fp(terms_enum_t *terms_enum, uint32_t fp, uint32_t length) {
     terms_enum_frame_t *f = get_frame(terms_enum, 1 + terms_enum->current_frame->ord);
-    f->arc = arc;
 
     if ((f->fp_orig == fp) && (f->next_ent != -1)) {
         if (f->ord > terms_enum->target_before_current_length) {
@@ -178,7 +179,7 @@ terms_enum_frame_t *push_frame_fp(terms_enum_t *terms_enum, arc_t *arc, uint64_t
     } else {
         f->next_ent = -1;
         f->prefix = length;
-        f->state->term_block_ord = 0;
+        f->state.term_block_ord = 0;
         f->fp_orig = f->fp = fp;
         f->last_sub_fp = -1;
     }
@@ -192,8 +193,8 @@ static terms_enum_frame_t *push_frame_bytes_ref(terms_enum_t *terms_enum, arc_t 
             .index = frame_data->offset
     };
 
-    uint64_t code = wram_read_vlong(&reader);
-    uint64_t fp_seek = code >> OUTPUT_FLAGS_NUM_BITS;
+    uint32_t code = wram_read_false_vlong(&reader);
+    uint32_t fp_seek = code >> OUTPUT_FLAGS_NUM_BITS;
     terms_enum_frame_t *f = get_frame(terms_enum, 1 + terms_enum->current_frame->ord);
     f->has_terms = (code & OUTPUT_FLAG_HAS_TERMS) != 0;
     f->has_terms_orig = f->has_terms;
@@ -203,20 +204,19 @@ static terms_enum_frame_t *push_frame_bytes_ref(terms_enum_t *terms_enum, arc_t 
         set_floor_data(f, &reader, frame_data);
     }
 
-    push_frame_fp(terms_enum, arc, fp_seek, length);
+    push_frame_fp(terms_enum, fp_seek, length);
 
     return f;
 }
 
 static terms_enum_frame_t *get_frame(terms_enum_t *terms_enum, int32_t ord) {
     if (ord >= terms_enum->stack_length) {
-        terms_enum_frame_t *next = malloc((ord + 1) * sizeof(*next));
-        memcpy(next, terms_enum->stack, ord * sizeof(*(terms_enum->stack)));
-        for (int stack_ord = terms_enum->stack_length; stack_ord < ord + 1; ++stack_ord) {
-            term_enum_frame_init(next + stack_ord, terms_enum, stack_ord);
+        if (ord >= MAX_STACK_LENGTH) {
+            abort();
         }
-
-        terms_enum->stack = next;
+        for (int stack_ord = terms_enum->stack_length; stack_ord < ord + 1; ++stack_ord) {
+            term_enum_frame_init(terms_enum->stack + stack_ord, terms_enum, stack_ord);
+        }
         terms_enum->stack_length = (uint32_t) (ord + 1);
     }
 
@@ -225,29 +225,26 @@ static terms_enum_frame_t *get_frame(terms_enum_t *terms_enum, int32_t ord) {
 
 static arc_t *get_arc(terms_enum_t *terms_enum, int32_t ord) {
     if (ord >= terms_enum->arcs_length) {
-        arc_t *next = malloc((ord + 1) * sizeof(*next));
-        memcpy(next, terms_enum->arcs, ord * sizeof(*(terms_enum->arcs)));
-
-        terms_enum->arcs = next;
+        if (ord >= MAX_ARCS_LENGTH) {
+            abort();
+        }
         terms_enum->arcs_length = (uint32_t) (ord + 1);
     }
 
     return terms_enum->arcs + ord;
 }
 
-term_state_t *get_term_state(terms_enum_t *terms_enum) {
-    term_state_t *result = malloc(sizeof(*result));
+void get_term_state(terms_enum_t *terms_enum, term_state_t *term_state) {
     decode_metadata(terms_enum->current_frame);
-    memcpy(result, terms_enum->current_frame->state, sizeof(*result));
-    return result;
+    memcpy(term_state, &terms_enum->current_frame->state, sizeof(*term_state));
 }
 
 int32_t get_doc_freq(terms_enum_t *terms_enum) {
     decode_metadata(terms_enum->current_frame);
-    return terms_enum->current_frame->state->doc_freq;
+    return terms_enum->current_frame->state.doc_freq;
 }
 
 int64_t get_total_term_freq(terms_enum_t *terms_enum) {
     decode_metadata(terms_enum->current_frame);
-    return terms_enum->current_frame->state->total_term_freq;
+    return terms_enum->current_frame->state.total_term_freq;
 }

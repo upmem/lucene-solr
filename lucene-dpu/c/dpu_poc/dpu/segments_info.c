@@ -20,7 +20,7 @@ segments_info_t *parse_segments_info(mram_addr_t offset) {
 
     segments_info = malloc(sizeof(segments_info_t));
 
-    segments_info->index_header = read_index_header(&buffer);
+    read_index_header(&segments_info->index_header, &buffer);
 
     segments_info->SegVersion[0] = mram_read_int(&buffer, false);
     segments_info->SegVersion[1] = mram_read_int(&buffer, false);
@@ -64,7 +64,7 @@ segments_info_t *parse_segments_info(mram_addr_t offset) {
 
     segments_info->NumSortFields = mram_read_vint(&buffer, false);
 
-    segments_info->codec_footer = read_codec_footer(&buffer);
+    read_codec_footer(&segments_info->codec_footer, &buffer);
 
     return segments_info;
 }

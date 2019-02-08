@@ -19,7 +19,7 @@ typedef struct {
     uint8_t *suffix_bytes;
 } index_header_t;
 
-index_header_t *read_index_header(mram_reader_t *buffer);
+void read_index_header(index_header_t *index_header, mram_reader_t *buffer);
 
 uint32_t check_index_header(mram_reader_t *in);
 

@@ -17,7 +17,7 @@
 #define STORE_PAYLOADS          0x4
 #define SOFT_DELETES_FIELD      0x8
 
-static field_infos_t *field_infos_new(field_info_t *infos, uint32_t infos_length);
+static void field_infos_fill(field_infos_t *field_infos, field_info_t *infos, uint32_t infos_length);
 
 static index_options_t get_index_options(uint8_t b);
 
@@ -42,7 +42,7 @@ int32_t compare_index_options(index_options_t first, index_options_t second) {
     return ((int32_t) first) - ((int32_t) second);
 }
 
-field_infos_t *read_field_infos(file_buffer_t *file) {
+void read_field_infos(field_infos_t *field_infos, file_buffer_t *file) {
     mram_reader_t _input = {
             .index = file->offset,
             .base = file->offset,
@@ -88,21 +88,19 @@ field_infos_t *read_field_infos(file_buffer_t *file) {
                         is_soft_deletes_field);
     }
 
-    return field_infos_new(infos, size);
+    field_infos_fill(field_infos, infos, size);
 }
 
-static field_infos_t *field_infos_new(field_info_t *infos, uint32_t infos_length) {
-    field_infos_t *result = malloc(sizeof(*result));
-
-    result->has_vectors = false;
-    result->has_prox = false;
-    result->has_payloads = false;
-    result->has_offsets = false;
-    result->has_freq = false;
-    result->has_norms = false;
-    result->has_doc_values = false;
-    result->has_point_values = false;
-    result->soft_deletes_field = NULL;
+static void field_infos_fill(field_infos_t *field_infos, field_info_t *infos, uint32_t infos_length) {
+    field_infos->has_vectors = false;
+    field_infos->has_prox = false;
+    field_infos->has_payloads = false;
+    field_infos->has_offsets = false;
+    field_infos->has_freq = false;
+    field_infos->has_norms = false;
+    field_infos->has_doc_values = false;
+    field_infos->has_point_values = false;
+    field_infos->soft_deletes_field = NULL;
 
     uint32_t max_number = 0;
     for (int i = 0; i < infos_length; ++i) {
@@ -111,29 +109,27 @@ static field_infos_t *field_infos_new(field_info_t *infos, uint32_t infos_length
         }
     }
 
-    result->by_number_length = max_number + 1;
-    result->by_number = malloc(result->by_number_length * sizeof(*(result->by_number)));
+    field_infos->by_number_length = max_number + 1;
+    field_infos->by_number = malloc(field_infos->by_number_length * sizeof(*(field_infos->by_number)));
 
     for (int i = 0; i < infos_length; ++i) {
         field_info_t *info = infos + i;
 
-        result->has_vectors |= info->store_term_vector;
-        result->has_prox |= compare_index_options(info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
-        result->has_freq |= info->index_options != INDEX_OPTIONS_DOCS;
-        result->has_offsets |=
+        field_infos->has_vectors |= info->store_term_vector;
+        field_infos->has_prox |= compare_index_options(info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
+        field_infos->has_freq |= info->index_options != INDEX_OPTIONS_DOCS;
+        field_infos->has_offsets |=
                 compare_index_options(info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0;
-        result->has_norms |= (info->index_options != INDEX_OPTIONS_NONE) && !info->omit_norms;
-        result->has_doc_values |= info->doc_values_type != DOC_VALUES_TYPE_NONE;
-        result->has_payloads |= info->store_payloads;
-        result->has_point_values |= info->point_data_dimension_count != 0;
+        field_infos->has_norms |= (info->index_options != INDEX_OPTIONS_NONE) && !info->omit_norms;
+        field_infos->has_doc_values |= info->doc_values_type != DOC_VALUES_TYPE_NONE;
+        field_infos->has_payloads |= info->store_payloads;
+        field_infos->has_point_values |= info->point_data_dimension_count != 0;
         if (info->soft_deletes_field) {
-            result->soft_deletes_field = info->name;
+            field_infos->soft_deletes_field = info->name;
         }
 
-        result->by_number[info->number] = info;
+        field_infos->by_number[info->number] = info;
     }
-
-    return result;
 }
 
 static index_options_t get_index_options(uint8_t b) {

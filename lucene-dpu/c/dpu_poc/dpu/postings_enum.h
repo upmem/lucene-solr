@@ -17,6 +17,8 @@
 
 #define NO_MORE_DOCS 0x7fffffff
 
+#define MAX_ENCODED_SIZE (BLOCK_SIZE * 4)
+
 typedef struct {
     mram_reader_t *start_doc_in;
     mram_reader_t *doc_in;
@@ -43,12 +45,12 @@ typedef struct {
     uint32_t doc_buffer_up_to;
     bool skipped;
 
-    uint8_t *encoded;
+    uint8_t encoded[MAX_ENCODED_SIZE];
 
     for_util_t *for_util;
 } postings_enum_t;
 
-postings_enum_t *impacts(terms_enum_t *terms_enum, uint32_t flags, mram_reader_t *doc_reader, for_util_t *for_util);
+void impacts(postings_enum_t *postings_enum, terms_enum_t *terms_enum, uint32_t flags, mram_reader_t *doc_reader, for_util_t *for_util);
 
 int32_t postings_next_doc(postings_enum_t *postings_enum);
 

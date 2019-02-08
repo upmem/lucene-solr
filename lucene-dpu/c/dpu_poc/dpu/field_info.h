@@ -60,6 +60,6 @@ typedef struct {
 
 int32_t compare_index_options(index_options_t first, index_options_t second);
 
-field_infos_t *read_field_infos(file_buffer_t *file);
+void read_field_infos(field_infos_t *field_infos, file_buffer_t *file);
 
 #endif //DPU_POC_FIELD_INFO_H

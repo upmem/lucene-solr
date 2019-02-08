@@ -10,7 +10,7 @@
 #include "codec_footer.h"
 
 typedef struct {
-    index_header_t *index_header;
+    index_header_t index_header;
     int32_t SegVersion[3];
     uint8_t HasMinVersion;
     int32_t MinVersion[3];
@@ -23,7 +23,7 @@ typedef struct {
     int32_t AttributesCount;
     uint8_t ***Attributes;
     int32_t NumSortFields;
-    codec_footer_t *codec_footer;
+    codec_footer_t codec_footer;
 } segments_info_t;
 
 segments_info_t *parse_segments_info(mram_addr_t offset);

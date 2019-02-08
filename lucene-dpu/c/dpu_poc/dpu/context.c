@@ -14,8 +14,8 @@
 #include "mram_structure.h"
 #include "dpu_characteristics.h"
 #include "segments_info.h"
-#include "cfe.h"
 #include "alloc_wrapper.h"
+#include "terms_enum_frame.h"
 
 query_t __attribute__((aligned(MRAM_ACCESS_ALIGNMENT))) the_query;
 
@@ -48,22 +48,20 @@ static const char *lucene_file_extension[LUCENE_FILE_ENUM_LENGTH] =
 
 static void generate_file_buffers_from_cfs(mram_addr_t cfe_offset, mram_addr_t cfs_offset, file_buffer_t *file_buffers);
 static lucene_file_e extension_to_index(uint8_t *file_name);
-static term_reader_t *build_fields_producer(search_context_t *ctx);
+static void build_fields_producer(term_reader_t *term_reader, search_context_t *ctx);
 
-static mram_reader_t *build_doc_reader(file_buffer_t *file_buffers) {
+static void build_doc_reader(mram_reader_t *doc_reader, file_buffer_t *file_buffers) {
     file_buffer_t *docs = file_buffers + LUCENE_FILE_DOC;
 
-    mram_reader_t *doc_reader = malloc(sizeof(*doc_reader));
     doc_reader->index = docs->offset;
     doc_reader->base = docs->offset;
     doc_reader->cache = mram_cache_for(me());
 
     check_index_header(doc_reader);
-    return doc_reader;
 }
 
 static norms_reader_t *build_norms_reader(search_context_t *ctx) {
-    field_infos_t *field_infos = ctx->field_infos;
+    field_infos_t *field_infos = &ctx->field_infos;
 
     file_buffer_t *buffer_norms_data = ctx->file_buffers + LUCENE_FILE_NVD;
     file_buffer_t *buffer_norms_metadata = ctx->file_buffers + LUCENE_FILE_NVM;
@@ -102,10 +100,10 @@ search_context_t *initialize_context(uint32_t index) {
         abort();
     }
 
-    context->field_infos = read_field_infos(context->file_buffers + LUCENE_FILE_FNM);
-    context->term_reader = build_fields_producer(context);
-    context->doc_reader = build_doc_reader(context->file_buffers);
-    context->for_util = build_for_util(context->doc_reader);
+    read_field_infos(&context->field_infos, context->file_buffers + LUCENE_FILE_FNM);
+    build_fields_producer(&context->term_reader, context);
+    build_doc_reader(&context->doc_reader, context->file_buffers);
+    context->for_util = build_for_util(&context->doc_reader, index);
     context->norms_reader = build_norms_reader(context);
 
     return context;
@@ -124,30 +122,51 @@ terms_enum_t *initialize_terms_enum(uint32_t index, field_reader_t *field_reader
 
     terms_enum->field_reader = field_reader;
     terms_enum->in = NULL;
-    terms_enum->stack = NULL;
     terms_enum->stack_length = 0;
-    terms_enum->static_frame = term_enum_frame_new(terms_enum, -1);
+    term_enum_frame_init(&terms_enum->static_frame, terms_enum, -1);
 
-    terms_enum->arcs = malloc(sizeof(*(terms_enum->arcs)));
     memset(terms_enum->arcs, 0, sizeof(*(terms_enum->arcs)));
     terms_enum->arcs_length = 1;
 
-    terms_enum->current_frame = terms_enum->static_frame;
+    terms_enum->current_frame = &terms_enum->static_frame;
 
     terms_enum->valid_index_prefix = 0;
     terms_enum->term = bytes_ref_new();
+
+    terms_enum->fst_reader.base = field_reader->index.mram_start_offset;
+    terms_enum->fst_reader.index = field_reader->index.mram_start_offset + field_reader->index.mram_length - 1;
+    terms_enum->fst_reader.cache = mram_cache_for(me());
 
     return terms_enum;
 }
 
 static void generate_file_buffers_from_cfs(mram_addr_t cfe_offset, mram_addr_t cfs_offset, file_buffer_t *file_buffers) {
-    cfe_info_t *cfe_info = parse_cfe_info(cfe_offset);
+    // parse_cfe merged to avoid allocation
+    mram_reader_t buffer = {
+            .index = cfe_offset,
+            .base = cfe_offset,
+            .cache = mram_cache_for(me())
+    };
+    unsigned int each;
+    uint32_t unused_length;
 
-    for (uint32_t each = 0; each < cfe_info->num_entries; each++) {
-        unsigned int file_buffers_id = extension_to_index(cfe_info->entries[each].entry_name);
-        file_buffers[file_buffers_id].offset = cfs_offset + cfe_info->entries[each].offset;
-        file_buffers[file_buffers_id].length = cfe_info->entries[each].length;
+    index_header_t index_header;
+    read_index_header(&index_header, &buffer);
+
+    uint32_t num_entries = mram_read_vint(&buffer, false);
+
+    for (each = 0; each < num_entries; each++) {
+        char* entry_name = mram_read_string(&buffer, &unused_length, false);
+        uint32_t offset = mram_read_false_long(&buffer, false);
+        uint32_t length = mram_read_false_long(&buffer, false);
+
+        unsigned int file_buffers_id = extension_to_index((uint8_t*)entry_name);
+        file_buffers[file_buffers_id].offset = cfs_offset + offset;
+        file_buffers[file_buffers_id].length = length;
     }
+
+    codec_footer_t codec_footer;
+    read_codec_footer(&codec_footer, &buffer);
 }
 
 static lucene_file_e extension_to_index(uint8_t *file_name) {
@@ -161,23 +180,10 @@ static lucene_file_e extension_to_index(uint8_t *file_name) {
 }
 
 
-static term_reader_t *build_fields_producer(search_context_t *ctx) {
-    field_infos_t *field_infos = ctx->field_infos;
-
+static void build_fields_producer(term_reader_t *term_reader, search_context_t *ctx) {
+    field_infos_t *field_infos = &ctx->field_infos;
     file_buffer_t *terms_dict = ctx->file_buffers + LUCENE_FILE_TIM;
     file_buffer_t *terms_index = ctx->file_buffers + LUCENE_FILE_TIP;
 
-    mram_cache_t* cache = mram_cache_for(me());
-
-    mram_reader_t *terms_in = malloc(sizeof(*terms_in));
-    terms_in->index = terms_dict->offset;
-    terms_in->base = terms_dict->offset;
-    terms_in->cache = cache;
-
-    mram_reader_t *index_in = malloc(sizeof(*index_in));
-    index_in->index = terms_index->offset;
-    index_in->base = terms_index->offset;
-    index_in->cache = cache;
-
-    return term_reader_new(field_infos, terms_in, (uint32_t) terms_dict->length, index_in, (uint32_t) terms_index->length);
+    term_reader_new(term_reader, field_infos, terms_dict, terms_index);
 }

@@ -3,8 +3,7 @@
 #include "alloc_wrapper.h"
 #include "postings_enum.h"
 #include "terms_enum.h"
-
-#define MAX_ENCODED_SIZE (BLOCK_SIZE * 4)
+#include "terms_enum_frame.h"
 
 #define ALL_VALUES_EQUAL 0
 
@@ -58,19 +57,17 @@ static postings_enum_t *postings_enum_reset(postings_enum_t *postings_enum, term
     return postings_enum;
 }
 
-postings_enum_t *impacts(terms_enum_t *terms_enum, uint32_t flags, mram_reader_t *doc_reader, for_util_t *for_util) {
+void impacts(postings_enum_t *postings_enum, terms_enum_t *terms_enum, uint32_t flags, mram_reader_t *doc_reader, for_util_t *for_util) {
     decode_metadata(terms_enum->current_frame);
 
     field_info_t *field_info = terms_enum->field_reader->field_info;
-    term_state_t *state = terms_enum->current_frame->state;
+    term_state_t *state = &terms_enum->current_frame->state;
 
     bool index_has_positions =
             compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
 
     if (!index_has_positions || ((flags & POSTINGS_ENUM_POSITIONS) == 0)) {
         // todo no reuse
-
-        postings_enum_t *postings_enum = malloc(sizeof(*postings_enum));
 
         postings_enum->start_doc_in = doc_reader;
         postings_enum->doc_in = NULL;
@@ -83,7 +80,6 @@ postings_enum_t *impacts(terms_enum_t *terms_enum, uint32_t flags, mram_reader_t
                                                                  INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >=
                                            0;
         postings_enum->index_has_payloads = field_info->store_payloads;
-        postings_enum->encoded = malloc(MAX_ENCODED_SIZE);
 
         postings_enum->for_util = for_util;
 
@@ -92,7 +88,7 @@ postings_enum_t *impacts(terms_enum_t *terms_enum, uint32_t flags, mram_reader_t
         postings_enum->freq_buffer = malloc(MAX_DATA_SIZE * sizeof(*(postings_enum->freq_buffer)));
         postings_enum->doc_delta_buffer = malloc(MAX_DATA_SIZE * sizeof(*(postings_enum->doc_delta_buffer)));
 
-        return postings_enum_reset(postings_enum, state, flags);
+        postings_enum_reset(postings_enum, state, flags);
     } else {
         abort();
     }

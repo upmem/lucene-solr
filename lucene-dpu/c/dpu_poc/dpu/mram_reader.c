@@ -50,8 +50,7 @@ uint16_t mram_read_short(mram_reader_t *reader, bool decrement) {
 
 uint32_t mram_read_int(mram_reader_t *reader, bool decrement) {
     // todo something more efficient?
-    return (uint32_t) (((mram_read_byte(reader, decrement) & 0xFF) << 24) | ((mram_read_byte(reader, decrement) & 0xFF) << 16) |
-                       ((mram_read_byte(reader, decrement) & 0xFF) << 8) | (mram_read_byte(reader, decrement) & 0xFF));
+    return ((((uint32_t) mram_read_short(reader, decrement)) & 0xffff) << 16) | (((uint32_t) mram_read_short(reader, decrement)) & 0xffff);
 }
 
 uint32_t mram_read_vint(mram_reader_t *reader, bool decrement) {
@@ -68,14 +67,13 @@ uint32_t mram_read_vint(mram_reader_t *reader, bool decrement) {
 
 uint64_t mram_read_long(mram_reader_t *reader, bool decrement) {
     // todo something more efficient?
-    return (uint64_t) ((((uint64_t)   (mram_read_byte(reader, decrement) & 0xFF)) << 56)
-                       | (((uint64_t) (mram_read_byte(reader, decrement) & 0xFF)) << 48)
-                       | (((uint64_t) (mram_read_byte(reader, decrement) & 0xFF)) << 40)
-                       | (((uint64_t) (mram_read_byte(reader, decrement) & 0xFF)) << 32)
-                       | (((uint64_t) (mram_read_byte(reader, decrement) & 0xFF)) << 24)
-                       | (((uint64_t) (mram_read_byte(reader, decrement) & 0xFF)) << 16)
-                       | (((uint64_t) (mram_read_byte(reader, decrement) & 0xFF)) << 8)
-                       | (((uint64_t)  mram_read_byte(reader, decrement) & 0xFF)));
+    return ((((uint64_t) mram_read_int(reader, decrement)) & 0xffffffffl) << 32) |
+            (((uint64_t) mram_read_int(reader, decrement)) & 0xffffffffl);
+}
+
+uint32_t mram_read_false_long(mram_reader_t *reader, bool decrement) {
+    mram_skip_bytes(reader, 4, decrement);
+    return mram_read_int(reader, decrement);
 }
 
 uint64_t mram_read_vlong(mram_reader_t *reader, bool decrement) {
@@ -88,6 +86,10 @@ uint64_t mram_read_vlong(mram_reader_t *reader, bool decrement) {
         i |= (b & 0x7F) << shift;
     }
     return i;
+}
+
+uint32_t mram_read_false_vlong(mram_reader_t *reader, bool decrement) {
+    return mram_read_vint(reader, decrement);
 }
 
 char *mram_read_string(mram_reader_t *reader, uint32_t *length, bool decrement) {

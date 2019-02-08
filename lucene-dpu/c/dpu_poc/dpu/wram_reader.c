@@ -39,3 +39,7 @@ uint64_t wram_read_vlong(wram_reader_t *reader) {
     }
     return i;
 }
+
+uint32_t wram_read_false_vlong(wram_reader_t *reader) {
+    return wram_read_vint(reader);
+}

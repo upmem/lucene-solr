@@ -5,9 +5,12 @@
 #include <stdlib.h>
 #include "math.h"
 
+#include "dpu_characteristics.h"
 #include "terms_enum.h"
 #include "for_util.h"
 #include "alloc_wrapper.h"
+
+for_util_t for_utils[NR_THREADS];
 
 static uint32_t encoded_size(uint32_t bits_per_value) {
     return (uint32_t) (BLOCK_SIZE * bits_per_value + 7) / 8;
@@ -41,15 +44,10 @@ static void fill_decoder(packed_int_decoder_t *decoder, uint32_t bits_per_value)
     decoder->int_mask = (uint32_t) decoder->mask;
 }
 
-for_util_t *build_for_util(mram_reader_t *doc_reader) {
-    for_util_t *for_util = malloc(sizeof(*for_util));
+for_util_t *build_for_util(mram_reader_t *doc_reader, uint32_t index) {
+    for_util_t *for_util = for_utils + index;
 
     uint32_t packed_ints_version = mram_read_vint(doc_reader, false);
-
-    for_util->setup_done = malloc(33 * sizeof(*(for_util->setup_done)));
-    for_util->encoded_sizes = malloc(33 * sizeof(*(for_util->encoded_sizes)));
-    for_util->decoders = malloc(33 * sizeof(*(for_util->decoders)));
-    for_util->iterations = malloc(33 * sizeof(*(for_util->iterations)));
 
     for (int i = 1; i < 33; ++i) {
         uint32_t code = mram_read_vint(doc_reader, false);

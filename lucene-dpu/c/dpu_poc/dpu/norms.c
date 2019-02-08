@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include "norms.h"
 #include "alloc_wrapper.h"
@@ -18,7 +19,10 @@ static norms_entry_t **readFields_rec(mram_reader_t *norms_metadata,
 
 
     if (fieldNumber == -1) {
-        return (norms_entry_t **) malloc((max_field_info_number + 1) * sizeof(norms_entry_t *));
+        size_t size = (max_field_info_number + 1) * sizeof(norms_entry_t *);
+        norms_entry_t** result = (norms_entry_t **) malloc(size);
+        memset(result, 0, size);
+        return result;
     }
     curr_field = malloc(sizeof(norms_entry_t));
 
@@ -63,11 +67,13 @@ norms_reader_t *norms_reader_new(mram_reader_t *norms_metadata,
                                  uint32_t norms_data_length,
                                  field_infos_t *field_infos) {
     norms_reader_t *reader = malloc(sizeof(norms_reader_t));
-    index_header_t *index_header = read_index_header(norms_metadata);
+    index_header_t index_header;
+    read_index_header(&index_header, norms_metadata);
 
     reader->norms_entries = readFields_rec(norms_metadata, 0, field_infos);
 
-    codec_footer_t *codec_footer = read_codec_footer(norms_metadata);
+    codec_footer_t codec_footer;
+    read_codec_footer(&codec_footer, norms_metadata);
 
     reader->norms_data = norms_data;
     reader->norms_data_length = norms_data_length;

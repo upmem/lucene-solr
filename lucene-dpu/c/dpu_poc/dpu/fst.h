@@ -46,7 +46,6 @@ bool arc_is_final(arc_t *arc);
 bool arc_is_last(arc_t *arc);
 arc_t *get_first_arc(fst_t *fst, arc_t *arc);
 arc_t *find_target_arc(fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, mram_reader_t *in);
-fst_t *fst_new(mram_reader_t *in);
-mram_reader_t *fst_get_bytes_reader(fst_t* fst);
+void fst_fill(fst_t *fst, mram_reader_t *in);
 
 #endif //DPU_POC_FST_H

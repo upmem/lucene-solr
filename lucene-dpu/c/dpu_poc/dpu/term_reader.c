@@ -4,6 +4,7 @@
 
 #include <stddef.h>
 #include <string.h>
+#include <defs.h>
 
 #include "term_reader.h"
 #include "alloc_wrapper.h"
@@ -30,8 +31,6 @@ static bytes_ref_t *read_bytes_ref(mram_reader_t *terms_in);
 
 static void seek_dir(mram_reader_t *in, uint32_t in_length);
 
-static fields_details_t * parse_fields_details(field_infos_t *field_infos, mram_reader_t *terms_in, uint32_t terms_in_length);
-
 static field_reader_t *field_reader_new(term_reader_t *parent,
                                         field_info_t *field_info,
                                         uint64_t index_start_fp,
@@ -51,68 +50,51 @@ field_reader_t *fetch_field_reader(term_reader_t *reader, const char *field) {
     return NULL;
 }
 
-term_reader_t * term_reader_new(field_infos_t *field_infos, mram_reader_t *terms_in, uint32_t terms_in_length,
-                                mram_reader_t *input_in, uint32_t input_in_length) {
-    // todo: Lucene parses both files at the same time
+void term_reader_new(term_reader_t *reader, field_infos_t *field_infos, file_buffer_t *terms_dict, file_buffer_t *terms_index) {
+    mram_cache_t* cache = mram_cache_for(me());
 
-    fields_details_t *details = parse_fields_details(field_infos, terms_in, terms_in_length);
+    reader->terms_in.index = terms_dict->offset;
+    reader->terms_in.base = terms_dict->offset;
+    reader->terms_in.cache = cache;
 
-    seek_dir(input_in, input_in_length);
-
-    term_reader_t *reader = malloc(sizeof(*reader));
-    reader->terms_in = terms_in;
-    reader->nr_fields = details->num_fields;
-    reader->fields = malloc(reader->nr_fields * sizeof(*(reader->fields)));
-
-    for (int i = 0; i < reader->nr_fields; ++i) {
-        field_details_t *field_detail = details->field_details + i;
-        term_reader_field_t *field = reader->fields + i;
-
-        uint64_t index_start_fp = mram_read_vlong(input_in, false);
-        field_info_t *field_info = field_infos->by_number[field_detail->field];
-
-        field->name = field_info->name;
-        field->field_reader = field_reader_new(reader,
-                                               field_info,
-                                               index_start_fp,
-                                               field_detail->longs_size,
-                                               field_detail->doc_count,
-                                               field_detail->sum_total_term_freq,
-                                               input_in);
-    }
-
-    return reader;
-}
-
-static fields_details_t *parse_fields_details(field_infos_t *field_infos, mram_reader_t *terms_in, uint32_t terms_in_length) {
-    fields_details_t *result = malloc(sizeof(*result));
+    mram_reader_t input_in = {
+            .index = terms_index->offset,
+            .base = terms_index->offset,
+            .cache = cache,
+    };
 
     // todo check header
 
-    seek_dir(terms_in, terms_in_length);
+    seek_dir(&reader->terms_in, terms_dict->length);
 
-    result->num_fields = mram_read_vint(terms_in, false);
-    result->field_details = malloc(result->num_fields * sizeof(*(result->field_details)));
+    uint32_t num_fields = mram_read_vint(&reader->terms_in, false);
 
-    for (int i = 0; i < result->num_fields; ++i) {
-        field_details_t *field = result->field_details + i;
+    seek_dir(&input_in, terms_index->length);
+    reader->nr_fields = num_fields;
+    reader->fields = malloc(reader->nr_fields * sizeof(*(reader->fields)));
 
-        field->field = mram_read_vint(terms_in, false);
-        field->num_terms = mram_read_vlong(terms_in, false);
-        field->root_code = read_bytes_ref(terms_in);
+    for (int i = 0; i < num_fields; ++i) {
+        uint32_t field = mram_read_vint(&reader->terms_in, false);
+        uint64_t num_terms = mram_read_vlong(&reader->terms_in, false);
+        bytes_ref_t *root_code = read_bytes_ref(&reader->terms_in);
 
-        field_info_t *field_info = field_infos->by_number[field->field];
+        field_info_t *field_info = field_infos->by_number[field];
 
-        field->sum_total_term_freq = mram_read_vlong(terms_in, false);
-        field->sum_doc_freq = (field_info->index_options == INDEX_OPTIONS_DOCS) ? field->sum_total_term_freq
-                                                                                : mram_read_vlong(terms_in, false);
-        field->doc_count = mram_read_vint(terms_in, false);
-        field->longs_size = mram_read_vint(terms_in, false);
-        field->min_term = read_bytes_ref(terms_in);
-        field->max_term = read_bytes_ref(terms_in);
+        uint64_t sum_total_term_freq = mram_read_vlong(&reader->terms_in, false);
+        uint64_t sum_doc_freq = (field_info->index_options == INDEX_OPTIONS_DOCS) ? sum_total_term_freq
+                                                                                : mram_read_vlong(&reader->terms_in, false);
+        uint32_t doc_count = mram_read_vint(&reader->terms_in, false);
+        uint32_t longs_size = mram_read_vint(&reader->terms_in, false);
+        bytes_ref_t *min_term = read_bytes_ref(&reader->terms_in);
+        bytes_ref_t *max_term = read_bytes_ref(&reader->terms_in);
+
+        term_reader_field_t *reader_field = reader->fields + i;
+
+        uint64_t index_start_fp = mram_read_vlong(&input_in, false);
+
+        reader_field->name = field_info->name;
+        reader_field->field_reader = field_reader_new(reader, field_info, index_start_fp, longs_size, doc_count, sum_total_term_freq, &input_in);
     }
-
-    return result;
 }
 
 static void seek_dir(mram_reader_t *in, uint32_t in_length) {
@@ -151,13 +133,9 @@ static field_reader_t *field_reader_new(term_reader_t *parent,
     reader->parent = parent;
     // todo other fields if needed
 
-    if (index_in != NULL) {
-        mram_reader_t *clone = mram_reader_clone(index_in);
-        set_index(clone, (uint32_t) index_start_fp);
-        reader->index = fst_new(clone);
-    } else {
-        reader->index = NULL;
-    }
+    mram_reader_t *clone = mram_reader_clone(index_in);
+    set_index(clone, (uint32_t) index_start_fp);
+    fst_fill(&reader->index, clone);
 
     return reader;
 }

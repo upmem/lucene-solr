@@ -26,7 +26,7 @@
 static arc_t *_find_target_arc(fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, mram_reader_t *in, bool use_root_arc_cache);
 static arc_t *copy_arc_from(arc_t *arc, arc_t *other);
 static int32_t read_label(fst_t *fst, mram_reader_t *in);
-static arc_t *read_first_real_target_arc(fst_t *fst, int64_t address, arc_t *arc, mram_reader_t *in);
+static arc_t *read_first_real_target_arc(fst_t *fst, int32_t address, arc_t *arc, mram_reader_t *in);
 static arc_t *read_next_real_arc(fst_t *fst, arc_t *arc, mram_reader_t *in);
 static bytes_ref_t *read_output(mram_reader_t *in);
 static bytes_ref_t *read_final_output(mram_reader_t *in);
@@ -71,66 +71,48 @@ arc_t *find_target_arc(fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t 
     return _find_target_arc(fst, label_to_match, follow, arc, in, true);
 }
 
-fst_t *fst_new(mram_reader_t *in) {
-    fst_t *result = malloc(sizeof(*result));
-
+void fst_fill(fst_t *fst, mram_reader_t *in) {
     check_header(in);
 
     if (mram_read_byte(in, false) == 1) {
         int32_t num_bytes = mram_read_vint(in, false);
 
         if (num_bytes <= 0) {
-            result->empty_output = (bytes_ref_t *) &EMPTY_BYTES;
+            fst->empty_output = (bytes_ref_t *) &EMPTY_BYTES;
         } else {
             mram_skip_bytes(in, num_bytes - 1, false);
 
-            result->empty_output = read_final_output(in);
+            fst->empty_output = read_final_output(in);
 
             mram_skip_bytes(in, num_bytes + 1, false);
         }
     } else {
-        result->empty_output = NULL;
+        fst->empty_output = NULL;
     }
 
     uint8_t t = mram_read_byte(in, false);
     switch (t) {
         case 0:
-            result->input_type = INPUT_TYPE_BYTE1;
+            fst->input_type = INPUT_TYPE_BYTE1;
             break;
         case 1:
-            result->input_type = INPUT_TYPE_BYTE2;
+            fst->input_type = INPUT_TYPE_BYTE2;
             break;
         case 2:
-            result->input_type = INPUT_TYPE_BYTE4;
+            fst->input_type = INPUT_TYPE_BYTE4;
             break;
         default:
             abort();
     }
-    result->start_node = mram_read_vlong(in, false);
-    int64_t num_bytes = mram_read_vlong(in, false);
+    fst->start_node = mram_read_false_vlong(in, false);
+    uint32_t num_bytes = mram_read_false_vlong(in, false);
 
-//    result->bytes_array = malloc((size_t) num_bytes);
-//    result->bytes_array_length = (uint32_t) num_bytes;
-//    mram_read_bytes(in, result->bytes_array, 0, (uint32_t) num_bytes, false);
-
-    result->mram_start_offset = in->index;
-    result->mram_length = num_bytes;
+    fst->mram_start_offset = in->index;
+    fst->mram_length = num_bytes;
 
     mram_skip_bytes(in, num_bytes, false);
 
-    cache_root_arcs(result);
-
-    return result;
-}
-
-mram_reader_t *fst_get_bytes_reader(fst_t* fst) {
-    mram_reader_t *result = malloc(sizeof(*result));
-
-    result->base = fst->mram_start_offset;
-    result->index = fst->mram_start_offset + fst->mram_length - 1;
-    result->cache = mram_cache_for(me());
-
-    return result;
+    cache_root_arcs(fst);
 }
 
 static void cache_root_arcs(fst_t *fst) {
@@ -246,7 +228,7 @@ static int32_t read_label(fst_t *fst, mram_reader_t *in) {
     return v;
 }
 
-static arc_t *read_first_real_target_arc(fst_t *fst, int64_t address, arc_t *arc, mram_reader_t *in) {
+static arc_t *read_first_real_target_arc(fst_t *fst, int32_t address, arc_t *arc, mram_reader_t *in) {
     set_index(in, (uint32_t) address);
 
     if (mram_read_byte(in, true) == ARCS_AS_FIXED_ARRAY) {

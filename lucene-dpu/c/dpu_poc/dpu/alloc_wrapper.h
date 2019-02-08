@@ -8,6 +8,5 @@
 #include <stddef.h>
 
 void* malloc(size_t size);
-void* calloc(size_t nmemb, size_t size);
 
 #endif //DPU_POC_ALLOC_WRAPPER_H

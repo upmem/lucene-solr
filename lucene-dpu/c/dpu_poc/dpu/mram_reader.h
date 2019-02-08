@@ -28,7 +28,9 @@ uint16_t mram_read_short(mram_reader_t *reader, bool decrement);
 uint32_t mram_read_int(mram_reader_t *reader, bool decrement);
 uint32_t mram_read_vint(mram_reader_t *reader, bool decrement);
 uint64_t mram_read_long(mram_reader_t *reader, bool decrement);
+uint32_t mram_read_false_long(mram_reader_t *reader, bool decrement);
 uint64_t mram_read_vlong(mram_reader_t *reader, bool decrement);
+uint32_t mram_read_false_vlong(mram_reader_t *reader, bool decrement);
 void mram_skip_bytes(mram_reader_t *reader, uint32_t length, bool decrement);
 
 char *mram_read_string(mram_reader_t *reader, uint32_t *length, bool decrement);

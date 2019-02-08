@@ -19,15 +19,17 @@ typedef struct {
     uint32_t int_mask;
 } packed_int_decoder_t;
 
-typedef struct {
-    bool *setup_done;
+#define FOR_UTIL_ARRAY_LENGTH 33
 
-    uint32_t *encoded_sizes;
-    packed_int_decoder_t *decoders;
-    uint32_t *iterations;
+typedef struct {
+    bool setup_done[FOR_UTIL_ARRAY_LENGTH];
+
+    uint32_t encoded_sizes[FOR_UTIL_ARRAY_LENGTH];
+    packed_int_decoder_t decoders[FOR_UTIL_ARRAY_LENGTH];
+    uint32_t iterations[FOR_UTIL_ARRAY_LENGTH];
 } for_util_t;
 
 
-for_util_t *build_for_util(mram_reader_t *doc_reader);
+for_util_t *build_for_util(mram_reader_t *doc_reader, uint32_t index);
 
 #endif /* __FOR_UTIL_H__ */

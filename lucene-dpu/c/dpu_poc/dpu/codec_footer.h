@@ -13,6 +13,6 @@ typedef struct {
     uint64_t checksum;
 } codec_footer_t;
 
-codec_footer_t *read_codec_footer(mram_reader_t *buffer);
+void read_codec_footer(codec_footer_t *codec_footer, mram_reader_t *buffer);
 
 #endif //DPU_POC_CODEC_FOOTER_H
