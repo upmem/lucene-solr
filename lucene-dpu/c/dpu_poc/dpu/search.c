@@ -11,6 +11,7 @@
 #include "term_reader.h"
 #include "bytes_ref.h"
 #include "bm25_scorer.h"
+#include "postings_enum.h"
 
 void search(search_context_t *ctx, char* field, char *value) {
     field_reader_t *field_reader = fetch_field_reader(&ctx->term_reader, field);
@@ -32,6 +33,7 @@ void search(search_context_t *ctx, char* field, char *value) {
                                            postings_enum.freq,
                                            getNorms(ctx->norms_reader, field_reader->field_info->number, doc),
                                            field_reader->sum_total_term_freq);
-            ktrace("doc:%d freq:%d score:%i\n", doc, postings_enum.freq, (int)score);
+            ktrace("doc:%d freq:%d score:%i\n", doc, postings_enum.freq, (int) score);
+        }
     }
 }
