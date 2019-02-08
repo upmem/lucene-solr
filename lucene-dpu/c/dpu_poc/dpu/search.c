@@ -11,6 +11,7 @@
 #include "term_reader.h"
 #include "term_scorer.h"
 #include "bytes_ref.h"
+#include "bm25_scorer.h"
 
 void search(search_context_t *ctx, char* field, char *value) {
     term_t *term = term_from_string(field, value);
@@ -33,12 +34,12 @@ void search(search_context_t *ctx, char* field, char *value) {
 
         int32_t doc;
         while ((doc = postings_next_doc(scorer->postings_enum)) != NO_MORE_DOCS) {
-            float score = compute_score(field_reader->doc_count,
-                                        (uint32_t) doc_freq,
-                                        scorer->postings_enum->freq,
-                                        getNorms(ctx->norms_reader, field_reader->field_info->number, doc),
-                                        field_reader->sum_total_term_freq);
-            ktrace("doc:%d freq:%d score:%f\n", doc, scorer->postings_enum->freq, score);
+            long long score = compute_bm25(field_reader->doc_count,
+                                           (uint32_t) doc_freq,
+                                           scorer->postings_enum->freq,
+                                           getNorms(ctx->norms_reader, field_reader->field_info->number, doc),
+                                           field_reader->sum_total_term_freq);
+            ktrace("doc:%d freq:%d score:%i\n", doc, scorer->postings_enum->freq, (int)score);
         }
     }
 }

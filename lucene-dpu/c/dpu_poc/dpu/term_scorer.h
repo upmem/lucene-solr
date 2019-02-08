@@ -46,6 +46,4 @@ term_weight_t *build_weight(term_t *term, score_mode_t score_mode, term_state_t 
 
 term_scorer_t *build_scorer(term_weight_t *weight, terms_enum_t *terms_enum, mram_reader_t *doc_reader, for_util_t *for_util);
 
-float compute_score(uint32_t doc_count, uint32_t doc_freq, int32_t freq, uint32_t doc_norm, int64_t total_term_freq);
-
 #endif //X86_POC_TERM_SCORER_H
