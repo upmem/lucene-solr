@@ -3,10 +3,13 @@
  */
 
 #include <string.h>
+#include <defs.h>
 #include "terms_enum.h"
 #include "terms_enum_frame.h"
 #include "alloc_wrapper.h"
 #include "field_info.h"
+
+#define MAX_LONGS_SIZE 3
 
 static seek_status_t scan_to_term_leaf(terms_enum_frame_t *frame, bytes_ref_t *target, bool exact_only);
 static seek_status_t scan_to_term_non_leaf(terms_enum_frame_t *frame, bytes_ref_t *target, bool exact_only);
@@ -16,7 +19,7 @@ static void next_frame_leaf(terms_enum_frame_t *frame);
 static bool next_frame_non_leaf(terms_enum_frame_t *frame);
 
 static void decode_term(int64_t *longs,
-                        wram_reader_t *in,
+                        mram_reader_t *in,
                         field_info_t *field_info,
                         term_state_t *state,
                         bool absolute) {
@@ -40,19 +43,19 @@ static void decode_term(int64_t *longs,
         }
     }
     if (state->doc_freq == 1) {
-        state->singleton_doc_id = wram_read_vint(in);
+        state->singleton_doc_id = mram_read_vint(in, false);
     } else {
         state->singleton_doc_id = -1;
     }
     if (field_has_positions) {
         if (state->total_term_freq > BLOCK_SIZE) {
-            state->last_pos_block_offset = wram_read_vlong(in);
+            state->last_pos_block_offset = mram_read_vlong(in, false);
         } else {
             state->last_pos_block_offset = -1;
         }
     }
     if (state->doc_freq > BLOCK_SIZE) {
-        state->skip_offset = wram_read_vlong(in);
+        state->skip_offset = mram_read_vlong(in, false);
     } else {
         state->skip_offset = -1;
     }
@@ -63,16 +66,20 @@ void decode_metadata(terms_enum_frame_t *frame) {
     bool absolute = frame->metadata_up_to == 0;
 
     while (frame->metadata_up_to < limit) {
-        frame->state.doc_freq = wram_read_vint(&frame->stats_reader);
+        frame->state.doc_freq = mram_read_vint(&frame->stats_reader, false);
         if (frame->ste->field_reader->field_info->index_options == INDEX_OPTIONS_DOCS) {
             frame->state.total_term_freq = frame->state.doc_freq;
         } else {
-            frame->state.total_term_freq = frame->state.doc_freq + wram_read_vlong(&frame->stats_reader);
+            frame->state.total_term_freq = frame->state.doc_freq + mram_read_vlong(&frame->stats_reader, false);
         }
+        if (frame->ste->field_reader->longs_size > MAX_LONGS_SIZE) {
+            halt();
+        }
+        int64_t longs[MAX_LONGS_SIZE];
         for (int i = 0; i < frame->ste->field_reader->longs_size; ++i) {
-            frame->longs[i] = wram_read_vlong(&frame->bytes_reader);
+            longs[i] = mram_read_vlong(&frame->bytes_reader, false);
         }
-        decode_term(frame->longs, &frame->bytes_reader, frame->ste->field_reader->field_info, &frame->state, absolute);
+        decode_term(longs, &frame->bytes_reader, frame->ste->field_reader->field_info, &frame->state, absolute);
         frame->metadata_up_to++;
         absolute = false;
     }
@@ -85,13 +92,6 @@ void term_enum_frame_init(terms_enum_frame_t *frame, terms_enum_t *term_enum, in
     frame->state.last_pos_block_offset = -1;
     frame->state.singleton_doc_id = -1;
     frame->state.total_term_freq = -1;
-    frame->longs = malloc((term_enum->field_reader->longs_size) * sizeof(*(frame->longs)));
-    frame->longs_length = term_enum->field_reader->longs_size;
-
-    frame->suffix_bytes_length = 0;
-    frame->stat_bytes_length = 0;
-    frame->floor_data_length = 0;
-    frame->bytes_length = 0;
 }
 
 void rewind_frame(terms_enum_frame_t *frame) {
@@ -107,9 +107,8 @@ void rewind_frame(terms_enum_frame_t *frame) {
 
 void set_floor_data(terms_enum_frame_t *frame, wram_reader_t *in, bytes_ref_t *source) {
     uint32_t num_bytes = source->length - (in->index - source->offset);
-    if (num_bytes > frame->floor_data_length) {
-        frame->floor_data = malloc(num_bytes);
-        frame->floor_data_length = num_bytes;
+    if (num_bytes > MAX_FLOOR_DATA) {
+        halt();
     }
     memcpy(frame->floor_data, source->bytes + source->offset + in->index, num_bytes);
     frame->floor_data_reader.buffer = frame->floor_data;
@@ -168,44 +167,30 @@ void load_block(terms_enum_frame_t *frame) {
         return;
     }
 
-    set_index(frame->ste->in, (uint32_t) frame->fp);
-    uint32_t code = mram_read_vint(frame->ste->in, false);
+    set_index(&frame->ste->in, (uint32_t) frame->fp);
+    uint32_t code = mram_read_vint(&frame->ste->in, false);
     frame->ent_count = code >> 1;
     frame->is_last_in_floor = (code & 1) != 0;
-    code = mram_read_vint(frame->ste->in, false);
+    code = mram_read_vint(&frame->ste->in, false);
     frame->is_leaf_block = (code & 1) != 0;
     uint32_t num_bytes = code >> 1;
-    if (frame->suffix_bytes_length < num_bytes) {
-        frame->suffix_bytes = malloc(num_bytes);
-        frame->suffix_bytes_length = num_bytes;
-    }
-    mram_read_bytes(frame->ste->in, frame->suffix_bytes, 0, num_bytes, false);
-    frame->suffixes_reader.index = 0;
-    frame->suffixes_reader.buffer = frame->suffix_bytes;
+    mram_reader_fill(&frame->suffixes_reader, &frame->ste->in);
+    mram_skip_bytes(&frame->ste->in, num_bytes, false);
 
-    num_bytes = mram_read_vint(frame->ste->in, false);
-    if (frame->stat_bytes_length < num_bytes) {
-        frame->stat_bytes = malloc(num_bytes);
-        frame->stat_bytes_length = num_bytes;
-    }
-    mram_read_bytes(frame->ste->in, frame->stat_bytes, 0, num_bytes, false);
-    frame->stats_reader.index = 0;
-    frame->stats_reader.buffer = frame->stat_bytes;
+    num_bytes = mram_read_vint(&frame->ste->in, false);
+    mram_reader_fill(&frame->stats_reader, &frame->ste->in);
+    mram_skip_bytes(&frame->ste->in, num_bytes, false);
+
     frame->metadata_up_to = 0;
     frame->state.term_block_ord = 0;
     frame->next_ent = 0;
     frame->last_sub_fp = -1;
 
-    num_bytes = mram_read_vint(frame->ste->in, false);
-    if (frame->bytes_length < num_bytes) {
-        frame->bytes = malloc(num_bytes);
-        frame->bytes_length = num_bytes;
-    }
-    mram_read_bytes(frame->ste->in, frame->bytes, 0, num_bytes, false);
-    frame->bytes_reader.index = 0;
-    frame->bytes_reader.buffer = frame->bytes;
+    num_bytes = mram_read_vint(&frame->ste->in, false);
+    mram_reader_fill(&frame->bytes_reader, &frame->ste->in);
+    mram_skip_bytes(&frame->ste->in, num_bytes, false);
 
-    frame->fp_end = frame->ste->in->index - frame->ste->in->base;
+    frame->fp_end = frame->ste->in.index - frame->ste->in.base;
 }
 
 seek_status_t scan_to_term(terms_enum_frame_t *frame, bytes_ref_t *target, bool exact_only) {
@@ -226,10 +211,10 @@ static seek_status_t scan_to_term_leaf(terms_enum_frame_t *frame, bytes_ref_t *t
     start_loop:
     while (true) {
         frame->next_ent++;
-        frame->suffix = wram_read_vint(&frame->suffixes_reader);
+        frame->suffix = mram_read_vint(&frame->suffixes_reader, false);
         uint32_t term_len = frame->prefix + frame->suffix;
-        frame->start_byte_pos = frame->suffixes_reader.index;
-        wram_skip_bytes(&frame->suffixes_reader, frame->suffix);
+        frame->start_byte_pos = frame->suffixes_reader.index - frame->suffixes_reader.base;
+        mram_skip_bytes(&frame->suffixes_reader, frame->suffix, false);
         uint32_t target_limit = target->offset + (target->length < term_len ? target->length : term_len);
         uint32_t target_pos = target->offset + frame->prefix;
         uint32_t byte_pos = frame->start_byte_pos;
@@ -237,7 +222,12 @@ static seek_status_t scan_to_term_leaf(terms_enum_frame_t *frame, bytes_ref_t *t
             int32_t cmp;
             bool stop;
             if (target_pos < target_limit) {
-                cmp = (frame->suffix_bytes[byte_pos++] & 0xFF) - (target->bytes[target_pos++] & 0xFF);
+                mram_addr_t previous_index = frame->suffixes_reader.index;
+                set_index(&frame->suffixes_reader, byte_pos);
+                uint8_t byte = mram_read_byte(&frame->suffixes_reader, false);
+                frame->suffixes_reader.index = previous_index;
+                byte_pos++;
+                cmp = (byte & 0xFF) - (target->bytes[target_pos++] & 0xFF);
                 stop = false;
             } else {
                 cmp = term_len - target->length;
@@ -279,19 +269,19 @@ static seek_status_t scan_to_term_non_leaf(terms_enum_frame_t *frame, bytes_ref_
     start_loop:
     while (frame->next_ent < frame->ent_count) {
         frame->next_ent++;
-        uint32_t code = wram_read_vint(&frame->suffixes_reader);
+        uint32_t code = mram_read_vint(&frame->suffixes_reader, false);
         frame->suffix = code >> 1;
 
         uint32_t term_len = frame->prefix + frame->suffix;
-        frame->start_byte_pos = frame->suffixes_reader.index;
-        wram_skip_bytes(&frame->suffixes_reader, frame->suffix);
+        frame->start_byte_pos = frame->suffixes_reader.index - frame->suffixes_reader.base;
+        mram_skip_bytes(&frame->suffixes_reader, frame->suffix, false);
         frame->ste->term_exists = (code & 1) == 0;
 
         if (frame->ste->term_exists) {
             frame->state.term_block_ord++;
             frame->sub_code = 0;
         } else {
-            frame->sub_code = wram_read_false_vlong(&frame->suffixes_reader);
+            frame->sub_code = mram_read_false_vlong(&frame->suffixes_reader, false);
             frame->last_sub_fp = frame->fp - frame->sub_code;
         }
 
@@ -304,7 +294,12 @@ static seek_status_t scan_to_term_non_leaf(terms_enum_frame_t *frame, bytes_ref_
             bool stop;
 
             if (target_pos < target_limit) {
-                cmp = (frame->suffix_bytes[byte_pos++] & 0xFF) - (target->bytes[target_pos++] & 0xFF);
+                mram_addr_t previous_index = frame->suffixes_reader.index;
+                set_index(&frame->suffixes_reader, byte_pos);
+                uint8_t byte = mram_read_byte(&frame->suffixes_reader, false);
+                frame->suffixes_reader.index = previous_index;
+                byte_pos++;
+                cmp = (byte & 0xFF) - (target->bytes[target_pos++] & 0xFF);
                 stop = false;
             } else {
                 cmp = term_len - target->length;
@@ -349,7 +344,10 @@ static void fill_term(terms_enum_frame_t *frame) {
     uint32_t term_len = frame->prefix + frame->suffix;
     frame->ste->term->length = term_len;
     bytes_ref_grow(frame->ste->term, term_len);
-    memcpy(frame->ste->term->bytes + frame->prefix, frame->suffix_bytes + frame->start_byte_pos, frame->suffix);
+    mram_addr_t previous_index = frame->suffixes_reader.index;
+    set_index(&frame->suffixes_reader, frame->start_byte_pos);
+    mram_read_bytes(&frame->suffixes_reader, frame->ste->term->bytes, frame->prefix, frame->suffix, false);
+    frame->suffixes_reader.index = previous_index;
 }
 
 static bool next_frame_entry(terms_enum_frame_t *frame) {
@@ -363,11 +361,11 @@ static bool next_frame_entry(terms_enum_frame_t *frame) {
 
 static void next_frame_leaf(terms_enum_frame_t *frame) {
     frame->next_ent++;
-    frame->suffix = wram_read_vint(&frame->suffixes_reader);
-    frame->start_byte_pos = frame->suffixes_reader.index;
+    frame->suffix = mram_read_vint(&frame->suffixes_reader, false);
+    frame->start_byte_pos = frame->suffixes_reader.index - frame->suffixes_reader.base;
     frame->ste->term->length = frame->prefix + frame->suffix;
     bytes_ref_grow(frame->ste->term, frame->ste->term->length);
-    wram_read_bytes(&frame->suffixes_reader, frame->ste->term->bytes, frame->prefix, frame->suffix);
+    mram_read_bytes(&frame->suffixes_reader, frame->ste->term->bytes, frame->prefix, frame->suffix, false);
     frame->ste->term_exists = true;
 }
 
@@ -384,12 +382,12 @@ static bool next_frame_non_leaf(terms_enum_frame_t *frame) {
         }
 
         frame->next_ent++;
-        uint32_t code = wram_read_vint(&frame->suffixes_reader);
+        uint32_t code = mram_read_vint(&frame->suffixes_reader, false);
         frame->suffix = code >> 1;
-        frame->start_byte_pos = frame->suffixes_reader.index;
+        frame->start_byte_pos = frame->suffixes_reader.index - frame->suffixes_reader.base;
         frame->ste->term->length = frame->prefix + frame->suffix;
         bytes_ref_grow(frame->ste->term, frame->ste->term->length);
-        wram_read_bytes(&frame->suffixes_reader, frame->ste->term->bytes, frame->prefix, frame->suffix);
+        mram_read_bytes(&frame->suffixes_reader, frame->ste->term->bytes, frame->prefix, frame->suffix, false);
         if ((code & 1) == 0) {
             frame->ste->term_exists = true;
             frame->sub_code = 0;
@@ -397,7 +395,7 @@ static bool next_frame_non_leaf(terms_enum_frame_t *frame) {
             return false;
         } else {
             frame->ste->term_exists = false;
-            frame->sub_code = wram_read_false_vlong(&frame->suffixes_reader);
+            frame->sub_code = mram_read_false_vlong(&frame->suffixes_reader, false);
             frame->last_sub_fp = frame->fp - frame->sub_code;
             return true;
         }

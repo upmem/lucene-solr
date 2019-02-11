@@ -1,5 +1,5 @@
-#include <stdlib.h>
 #include <string.h>
+#include <defs.h>
 
 #include "norms.h"
 #include "alloc_wrapper.h"
@@ -29,7 +29,7 @@ static norms_entry_t **readFields_rec(mram_reader_t *norms_metadata,
     field_info = field_infos->by_number[fieldNumber];
     field_info_number = field_info->number;
     if (field_info == NULL || !hasNorms(field_info)) {
-        abort();
+        halt();
     }
 
     curr_field->docsWithFieldOffset = mram_read_long(norms_metadata, false);
@@ -44,7 +44,7 @@ static norms_entry_t **readFields_rec(mram_reader_t *norms_metadata,
           || curr_field->bytesPerNorm == 2
           || curr_field->bytesPerNorm == 4
           || curr_field->bytesPerNorm == 8)) {
-        abort();
+        halt();
     }
 
     if (field_info_number > max_field_info_number) {
@@ -54,29 +54,34 @@ static norms_entry_t **readFields_rec(mram_reader_t *norms_metadata,
     norms_field_map = readFields_rec(norms_metadata, max_field_info_number, field_infos);
 
     if (norms_field_map[field_info_number] != NULL) {
-        abort();
+        halt();
     }
     norms_field_map[field_info_number] = curr_field;
     return norms_field_map;
 }
 
 
-norms_reader_t *norms_reader_new(mram_reader_t *norms_metadata,
-                                 uint32_t norms_metadata_length,
-                                 mram_reader_t *norms_data,
-                                 uint32_t norms_data_length,
-                                 field_infos_t *field_infos) {
+norms_reader_t *norms_reader_new(file_buffer_t *buffer_norms_metadata, file_buffer_t *buffer_norms_data,
+        field_infos_t *field_infos) {
     norms_reader_t *reader = malloc(sizeof(norms_reader_t));
+
+    mram_cache_t *cache = mram_cache_for(me());
+
+    mram_reader_t norms_metadata = {
+            .index = buffer_norms_metadata->offset,
+            .base = buffer_norms_metadata->offset,
+            .cache = cache,
+    };
+
     index_header_t index_header;
-    read_index_header(&index_header, norms_metadata);
+    read_index_header(&index_header, &norms_metadata);
 
-    reader->norms_entries = readFields_rec(norms_metadata, 0, field_infos);
+    reader->norms_entries = readFields_rec(&norms_metadata, 0, field_infos);
 
-    codec_footer_t codec_footer;
-    read_codec_footer(&codec_footer, norms_metadata);
-
-    reader->norms_data = norms_data;
-    reader->norms_data_length = norms_data_length;
+    reader->norms_data.index = buffer_norms_data->offset;
+    reader->norms_data.base = buffer_norms_data->offset;
+    reader->norms_data.cache = cache;
+    reader->norms_data_length = buffer_norms_data->length;
 
     return reader;
 }
@@ -90,22 +95,23 @@ uint64_t getNorms(norms_reader_t *reader, uint32_t field_number, int doc) {
         if (entry->bytesPerNorm == 0) {
             return entry->normsOffset;
         }
-        mram_reader_t *slice = mram_reader_clone(reader->norms_data);
-        mram_skip_bytes(slice, entry->normsOffset, false);
-        mram_skip_bytes(slice, doc * entry->bytesPerNorm, false);
+        mram_reader_t slice;
+        mram_reader_fill(&slice, &reader->norms_data);
+        mram_skip_bytes(&slice, entry->normsOffset, false);
+        mram_skip_bytes(&slice, doc * entry->bytesPerNorm, false);
         switch (entry->bytesPerNorm) {
             case 1:
-                return mram_read_byte(slice, false);
+                return mram_read_byte(&slice, false);
             case 2:
-                return mram_read_short(slice, false);
+                return mram_read_short(&slice, false);
             case 4:
-                return mram_read_int(slice, false);
+                return mram_read_int(&slice, false);
             case 8:
-                return mram_read_long(slice, false);
+                return mram_read_long(&slice, false);
             default:
-                abort();
+                halt();
         }
     } else {
-        abort();
+        halt();
     }
 }

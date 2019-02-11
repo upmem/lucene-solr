@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <query.h>
 #include "file.h"
 #include "string_map.h"
 
@@ -28,14 +29,14 @@ typedef enum {
 } index_options_t;
 
 typedef struct {
-    char *name;
+    char name[MAX_FIELD_SIZE];
     uint32_t number;
     doc_values_type_t doc_values_type;
     bool store_term_vector;
     bool omit_norms;
     index_options_t index_options;
     bool store_payloads;
-    string_map_t *attributes;
+    // todo attributes
     int64_t dv_gen;
     int32_t point_data_dimension_count;
     int32_t point_index_dimension_count;

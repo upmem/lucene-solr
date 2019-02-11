@@ -19,7 +19,7 @@ struct _mram_reader_t {
     mram_cache_t* cache;
 };
 
-mram_reader_t *mram_reader_clone(mram_reader_t* reader);
+void mram_reader_fill(mram_reader_t *dest, mram_reader_t *from);
 void set_index(mram_reader_t *input, uint32_t index);
 
 uint8_t mram_read_byte(mram_reader_t *reader, bool decrement);
@@ -33,7 +33,8 @@ uint64_t mram_read_vlong(mram_reader_t *reader, bool decrement);
 uint32_t mram_read_false_vlong(mram_reader_t *reader, bool decrement);
 void mram_skip_bytes(mram_reader_t *reader, uint32_t length, bool decrement);
 
-char *mram_read_string(mram_reader_t *reader, uint32_t *length, bool decrement);
-string_map_t *mram_read_map_of_strings(mram_reader_t *reader, bool decrement);
+void mram_read_string(mram_reader_t *reader, char* string, bool decrement);
+void mram_read_string_dummy(mram_reader_t *reader, bool decrement);
+void mram_read_map_of_strings_dummy(mram_reader_t *reader, bool decrement);
 
 #endif //DPU_POC_MRAM_READER_H

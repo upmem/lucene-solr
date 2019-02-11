@@ -133,9 +133,7 @@ static field_reader_t *field_reader_new(term_reader_t *parent,
     reader->parent = parent;
     // todo other fields if needed
 
-    mram_reader_t *clone = mram_reader_clone(index_in);
-    set_index(clone, (uint32_t) index_start_fp);
-    fst_fill(&reader->index, clone);
+    fst_fill(&reader->index, index_in, (uint32_t) index_start_fp);
 
     return reader;
 }

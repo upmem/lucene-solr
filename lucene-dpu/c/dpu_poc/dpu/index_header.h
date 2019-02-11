@@ -12,11 +12,11 @@
 
 typedef struct {
     uint32_t magic;
-    uint8_t *codec_name;
+    // todo codecName
     uint32_t version;
     int8_t object_id[LUCENE_INDEX_HEADER_OBJECTID_SIZE];
     uint8_t suffix_length;
-    uint8_t *suffix_bytes;
+    // todo suffixBytes
 } index_header_t;
 
 void read_index_header(index_header_t *index_header, mram_reader_t *buffer);

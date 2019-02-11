@@ -19,15 +19,12 @@ typedef struct {
 
 typedef struct {
     norms_entry_t **norms_entries;
-    mram_reader_t *norms_data;
+    mram_reader_t norms_data;
     uint32_t norms_data_length;
 } norms_reader_t;
 
-norms_reader_t *norms_reader_new(mram_reader_t *norms_metadata,
-                                 uint32_t norms_metadata_length,
-                                 mram_reader_t *norms_data,
-                                 uint32_t norms_data_length,
-                                 field_infos_t *field_infos);
+norms_reader_t *norms_reader_new(file_buffer_t *buffer_norms_metadata, file_buffer_t *buffer_norms_data,
+        field_infos_t *field_infos);
 
 uint64_t getNorms(norms_reader_t *reader, uint32_t field_number, int doc);
 

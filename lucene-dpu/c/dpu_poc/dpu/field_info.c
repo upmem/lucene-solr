@@ -3,7 +3,6 @@
  */
 
 #include <defs.h>
-#include <stdlib.h>
 #include "field_info.h"
 #include "mram_reader.h"
 #include "alloc_wrapper.h"
@@ -24,14 +23,12 @@ static index_options_t get_index_options(uint8_t b);
 static doc_values_type_t get_doc_values_types(uint8_t b);
 
 static void fill_field_info(field_info_t *info,
-                            char *name,
                             uint32_t number,
                             doc_values_type_t doc_values_type,
                             bool store_term_vector,
                             bool omit_norms,
                             index_options_t index_options,
                             bool store_payloads,
-                            string_map_t *attributes,
                             int64_t dv_gen,
                             int32_t point_data_dimension_count,
                             int32_t point_index_dimension_count,
@@ -55,8 +52,8 @@ void read_field_infos(field_infos_t *field_infos, file_buffer_t *file) {
     field_info_t *infos = malloc(size * sizeof(*infos));
 
     for (int i = 0; i < size; ++i) {
-        uint32_t name_length;
-        char *name = mram_read_string(input, &name_length, false);
+        field_info_t *field_info = infos + i;
+        mram_read_string(input, field_info->name, false);
         uint32_t field_number = mram_read_vint(input, false);
         uint8_t bits = mram_read_byte(input, false);
 
@@ -69,7 +66,8 @@ void read_field_infos(field_infos_t *field_infos, file_buffer_t *file) {
 
         doc_values_type_t doc_values_type = get_doc_values_types(mram_read_byte(input, false));
         int64_t dv_gen = mram_read_long(input, false);
-        string_map_t *attributes = mram_read_map_of_strings(input, false);
+        // attributes here
+        mram_read_map_of_strings_dummy(input, false);
         int32_t point_data_dimension_count = mram_read_vint(input, false);
         int32_t point_num_bytes;
         int32_t point_index_dimension_count = point_data_dimension_count;
@@ -82,8 +80,8 @@ void read_field_infos(field_infos_t *field_infos, file_buffer_t *file) {
             point_num_bytes = 0;
         }
 
-        fill_field_info(infos + i, name, field_number, doc_values_type, store_term_vector, omit_norms, index_options,
-                        store_payloads, attributes, dv_gen, point_data_dimension_count, point_index_dimension_count,
+        fill_field_info(field_info, field_number, doc_values_type, store_term_vector, omit_norms, index_options,
+                        store_payloads, dv_gen, point_data_dimension_count, point_index_dimension_count,
                         point_num_bytes,
                         is_soft_deletes_field);
     }
@@ -146,7 +144,7 @@ static index_options_t get_index_options(uint8_t b) {
             return INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS;
         default:
             // BUG
-            abort();
+            halt();
     }
 }
 
@@ -166,25 +164,22 @@ static doc_values_type_t get_doc_values_types(uint8_t b) {
             return DOC_VALUES_TYPE_SORTED_NUMERIC;
         default:
             // BUG
-            abort();
+            halt();
     }
 }
 
 static void fill_field_info(field_info_t *info,
-                            char *name,
                             uint32_t number,
                             doc_values_type_t doc_values_type,
                             bool store_term_vector,
                             bool omit_norms,
                             index_options_t index_options,
                             bool store_payloads,
-                            string_map_t *attributes,
                             int64_t dv_gen,
                             int32_t point_data_dimension_count,
                             int32_t point_index_dimension_count,
                             int32_t point_num_bytes,
                             bool soft_deletes_field) {
-    info->name = name;
     info->number = number;
     info->doc_values_type = doc_values_type;
     info->index_options = index_options;
@@ -199,7 +194,6 @@ static void fill_field_info(field_info_t *info,
         info->omit_norms = false;
     }
     info->dv_gen = dv_gen;
-    info->attributes = attributes;
     info->point_data_dimension_count = point_data_dimension_count;
     info->point_index_dimension_count = point_index_dimension_count;
     info->point_num_bytes = point_num_bytes;

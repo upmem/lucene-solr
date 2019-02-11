@@ -1,4 +1,4 @@
-#include <stdlib.h>
+#include <defs.h>
 
 #include "alloc_wrapper.h"
 #include "postings_enum.h"
@@ -35,10 +35,11 @@ static postings_enum_t *postings_enum_reset(postings_enum_t *postings_enum, term
     postings_enum->skip_offset = state->skip_offset;
     postings_enum->singleton_doc_id = state->singleton_doc_id;
     if (postings_enum->doc_freq > 1) {
-        if (postings_enum->doc_in == NULL) {
-            postings_enum->doc_in = mram_reader_clone(postings_enum->start_doc_in);
+        if (!postings_enum->doc_in_initialized) {
+            postings_enum->doc_in_initialized = true;
+            mram_reader_fill(&postings_enum->doc_in, postings_enum->start_doc_in);
         }
-        set_index(postings_enum->doc_in, (uint32_t) postings_enum->doc_term_start_fp);
+        set_index(&postings_enum->doc_in, (uint32_t) postings_enum->doc_term_start_fp);
     }
 
     postings_enum->doc = -1;
@@ -70,7 +71,7 @@ void impacts(postings_enum_t *postings_enum, terms_enum_t *terms_enum, uint32_t 
         // todo no reuse
 
         postings_enum->start_doc_in = doc_reader;
-        postings_enum->doc_in = NULL;
+        postings_enum->doc_in_initialized = false;
 
         postings_enum->index_has_freq =
                 compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS) >= 0;
@@ -90,7 +91,7 @@ void impacts(postings_enum_t *postings_enum, terms_enum_t *terms_enum, uint32_t 
 
         postings_enum_reset(postings_enum, state, flags);
     } else {
-        abort();
+        halt();
     }
 }
 
@@ -135,7 +136,7 @@ static void read_block(mram_reader_t *in, for_util_t *for_util, uint8_t *encoded
     }
 
     if (!for_util->setup_done[num_bits]) {
-        abort();
+        halt();
     }
 
     uint32_t encoded_size = for_util->encoded_sizes[num_bits];
@@ -156,7 +157,7 @@ static void skip_block(mram_reader_t *in, for_util_t *for_util) {
     }
 
     if (!for_util->setup_done[num_bits]) {
-        abort();
+        halt();
     }
 
     uint32_t encoded_size = for_util->encoded_sizes[num_bits];
@@ -189,22 +190,22 @@ static void postings_refill_docs(postings_enum_t *postings_enum) {
     uint32_t left = postings_enum->doc_freq - postings_enum->doc_up_to;
 
     if (left >= BLOCK_SIZE) {
-        read_block(postings_enum->doc_in, postings_enum->for_util, postings_enum->encoded,
+        read_block(&postings_enum->doc_in, postings_enum->for_util, postings_enum->encoded,
                    postings_enum->doc_delta_buffer);
 
         if (postings_enum->index_has_freq) {
             if (postings_enum->needs_freq) {
-                read_block(postings_enum->doc_in, postings_enum->for_util, postings_enum->encoded,
+                read_block(&postings_enum->doc_in, postings_enum->for_util, postings_enum->encoded,
                            postings_enum->freq_buffer);
             } else {
-                skip_block(postings_enum->doc_in, postings_enum->for_util);
+                skip_block(&postings_enum->doc_in, postings_enum->for_util);
             }
         }
     } else if (postings_enum->doc_freq == 1) {
         postings_enum->doc_delta_buffer[0] = postings_enum->singleton_doc_id;
         postings_enum->freq_buffer[0] = (int32_t) postings_enum->total_term_freq;
     } else {
-        read_vint_block(postings_enum->doc_in, postings_enum->doc_delta_buffer, postings_enum->freq_buffer, left,
+        read_vint_block(&postings_enum->doc_in, postings_enum->doc_delta_buffer, postings_enum->freq_buffer, left,
                         postings_enum->index_has_freq);
     }
 

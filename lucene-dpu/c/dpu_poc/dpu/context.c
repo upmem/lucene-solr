@@ -13,7 +13,6 @@
 #include "mram_access.h"
 #include "mram_structure.h"
 #include "dpu_characteristics.h"
-#include "segments_info.h"
 #include "alloc_wrapper.h"
 #include "terms_enum_frame.h"
 
@@ -21,6 +20,8 @@ query_t __attribute__((aligned(MRAM_ACCESS_ALIGNMENT))) the_query;
 
 search_context_t contexts[NR_THREADS];
 terms_enum_t terms_enums[NR_THREADS];
+
+#define MAX_FILE_EXTENSION_SIZE 5
 
 static const char *lucene_file_extension[LUCENE_FILE_ENUM_LENGTH] =
         {
@@ -66,19 +67,7 @@ static norms_reader_t *build_norms_reader(search_context_t *ctx) {
     file_buffer_t *buffer_norms_data = ctx->file_buffers + LUCENE_FILE_NVD;
     file_buffer_t *buffer_norms_metadata = ctx->file_buffers + LUCENE_FILE_NVM;
 
-    mram_reader_t *norms_data = malloc(sizeof(*norms_data));
-    norms_data->index = buffer_norms_data->offset;
-    norms_data->base = buffer_norms_data->offset;
-    norms_data->cache = mram_cache_for(me());
-
-    mram_reader_t *norms_metadata = malloc(sizeof(*norms_metadata));
-    norms_metadata->index = buffer_norms_metadata->offset;
-    norms_metadata->base = buffer_norms_metadata->offset;
-    norms_metadata->cache = mram_cache_for(me());
-
-    return norms_reader_new(norms_metadata, buffer_norms_metadata->length,
-                            norms_data, buffer_norms_data->length,
-                            field_infos);
+    return norms_reader_new(buffer_norms_metadata, buffer_norms_data, field_infos);
 }
 
 search_context_t *initialize_context(uint32_t index) {
@@ -88,17 +77,10 @@ search_context_t *initialize_context(uint32_t index) {
 
     read_files_offsets(index, offsets);
 
-    mram_addr_t si_offset = offsets[0];
     mram_addr_t cfe_offset = offsets[1];
     mram_addr_t cfs_offset = offsets[2];
 
-    segments_info_t *segments_info = parse_segments_info(si_offset);
-
-    if (segments_info->IsCompoundFile) {
-        generate_file_buffers_from_cfs(cfe_offset, cfs_offset, context->file_buffers);
-    } else {
-        abort();
-    }
+    generate_file_buffers_from_cfs(cfe_offset, cfs_offset, context->file_buffers);
 
     read_field_infos(&context->field_infos, context->file_buffers + LUCENE_FILE_FNM);
     build_fields_producer(&context->term_reader, context);
@@ -121,7 +103,7 @@ terms_enum_t *initialize_terms_enum(uint32_t index, field_reader_t *field_reader
     terms_enum_t *terms_enum = terms_enums + index;
 
     terms_enum->field_reader = field_reader;
-    terms_enum->in = NULL;
+    terms_enum->in_initialized = false;
     terms_enum->stack_length = 0;
     term_enum_frame_init(&terms_enum->static_frame, terms_enum, -1);
 
@@ -156,7 +138,8 @@ static void generate_file_buffers_from_cfs(mram_addr_t cfe_offset, mram_addr_t c
     uint32_t num_entries = mram_read_vint(&buffer, false);
 
     for (each = 0; each < num_entries; each++) {
-        char* entry_name = mram_read_string(&buffer, &unused_length, false);
+        char entry_name[MAX_FILE_EXTENSION_SIZE];
+        mram_read_string(&buffer, entry_name, false);
         uint32_t offset = mram_read_false_long(&buffer, false);
         uint32_t length = mram_read_false_long(&buffer, false);
 
@@ -164,9 +147,6 @@ static void generate_file_buffers_from_cfs(mram_addr_t cfe_offset, mram_addr_t c
         file_buffers[file_buffers_id].offset = cfs_offset + offset;
         file_buffers[file_buffers_id].length = length;
     }
-
-    codec_footer_t codec_footer;
-    read_codec_footer(&codec_footer, &buffer);
 }
 
 static lucene_file_e extension_to_index(uint8_t *file_name) {
@@ -176,7 +156,7 @@ static lucene_file_e extension_to_index(uint8_t *file_name) {
         if (!strncmp((const char *)&file_name[file_name_size - 3], &lucene_file_extension[each][1], 3))
             return each;
     }
-    abort();
+    halt();
 }
 
 

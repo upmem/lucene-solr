@@ -30,8 +30,7 @@ typedef struct {
 } arc_t;
 
 typedef struct {
-    uint8_t *bytes_array;
-    uint32_t bytes_array_length;
+    // todo bytesArray
     bytes_ref_t *empty_output;
     int32_t start_node;
     arc_t **cached_root_arcs;
@@ -46,6 +45,6 @@ bool arc_is_final(arc_t *arc);
 bool arc_is_last(arc_t *arc);
 arc_t *get_first_arc(fst_t *fst, arc_t *arc);
 arc_t *find_target_arc(fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, mram_reader_t *in);
-void fst_fill(fst_t *fst, mram_reader_t *in);
+void fst_fill(fst_t *fst, mram_reader_t *from, uint32_t index_start_fp);
 
 #endif //DPU_POC_FST_H

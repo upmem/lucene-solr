@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include <stdlib.h>
+#include <defs.h>
 
 #define K (1.2f)
 #define B (0.75f)
@@ -821,7 +821,7 @@ static int compute_log_idx(int val)
             return floor + ((val - cache_log_idx[floor]) >> (prev_segment));
         }
     }
-    abort();
+    halt();
 }
 
 static int compute_log(int val, int plus)

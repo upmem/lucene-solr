@@ -6,10 +6,10 @@
 #include "mram_reader.h"
 #include "alloc_wrapper.h"
 
-mram_reader_t *mram_reader_clone(mram_reader_t* reader) {
-    mram_reader_t *result = malloc(sizeof(*result));
-    memcpy(result, reader, sizeof(*reader));
-    return result;
+void mram_reader_fill(mram_reader_t *dest, mram_reader_t *from) {
+    dest->index = from->index;
+    dest->base = from->base;
+    dest->cache = from->cache;
 }
 
 void set_index(mram_reader_t *input, uint32_t index) {
@@ -92,26 +92,22 @@ uint32_t mram_read_false_vlong(mram_reader_t *reader, bool decrement) {
     return mram_read_vint(reader, decrement);
 }
 
-char *mram_read_string(mram_reader_t *reader, uint32_t *length, bool decrement) {
+void mram_read_string(mram_reader_t *reader, char* string, bool decrement) {
     // todo something more efficient?
-    *length = mram_read_vint(reader, decrement);
-    char *string = malloc(*length + 1);
-    mram_read_bytes(reader, (uint8_t *) string, 0, *length, decrement);
-    string[*length] = '\0';
-    return string;
+    uint32_t length = mram_read_vint(reader, decrement);
+    mram_read_bytes(reader, (uint8_t *) string, 0, length, decrement);
+    string[length] = '\0';
 }
 
-string_map_t *mram_read_map_of_strings(mram_reader_t *reader, bool decrement) {
-    // todo something more efficient?
-    string_map_t *result = malloc(sizeof(*result));
-    result->nr_entries = mram_read_vint(reader, decrement);
-    result->entries = malloc(result->nr_entries * sizeof(*(result->entries)));
-    for (int i = 0; i < result->nr_entries; ++i) {
-        string_map_entry_t *entry = result->entries + i;
-        uint32_t unused_length;
-        entry->key = mram_read_string(reader, &unused_length, decrement);
-        entry->value = mram_read_string(reader, &unused_length, decrement);
-    }
+void mram_read_string_dummy(mram_reader_t *reader, bool decrement) {
+    uint32_t length = mram_read_vint(reader, decrement);
+    mram_skip_bytes(reader, length, decrement);
+}
 
-    return result;
+void mram_read_map_of_strings_dummy(mram_reader_t *reader, bool decrement) {
+    uint32_t nr_entries = mram_read_vint(reader, decrement);
+    for (int i = 0; i < nr_entries; ++i) {
+        mram_read_string_dummy(reader, decrement);
+        mram_read_string_dummy(reader, decrement);
+    }
 }

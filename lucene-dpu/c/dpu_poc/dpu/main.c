@@ -10,7 +10,6 @@
 int main(void) {
     query_t *query;
     search_context_t *context;
-    terms_enum_t *terms_enum;
     uint32_t task_id = me();
 
     mram_cache_init(task_id);

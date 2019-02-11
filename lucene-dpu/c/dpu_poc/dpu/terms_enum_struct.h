@@ -13,6 +13,9 @@
 
 #define BLOCK_SIZE 128
 
+// todo adjust the MAX_FLOOR_DATA
+#define MAX_FLOOR_DATA 64
+
 #define MAX_ARCS_LENGTH 5
 #define MAX_STACK_LENGTH 5
 
@@ -51,26 +54,21 @@ typedef struct _terms_enum_frame_t {
     uint32_t suffix;
     uint32_t sub_code;
 
-    uint8_t *suffix_bytes;
-    uint8_t *floor_data;
-    uint8_t *stat_bytes;
-    int64_t *longs;
-    uint8_t *bytes;
+    // todo suffixBytes
+    uint8_t floor_data[MAX_FLOOR_DATA];
+    // todo statBytes
+    // todo longs
+    // todo bytes
 
-    uint32_t suffix_bytes_length;
-    uint32_t floor_data_length;
-    uint32_t stat_bytes_length;
-    uint32_t longs_length;
-    uint32_t bytes_length;
-
-    wram_reader_t suffixes_reader;
+    mram_reader_t suffixes_reader;
     wram_reader_t floor_data_reader;
-    wram_reader_t stats_reader;
-    wram_reader_t bytes_reader;
+    mram_reader_t stats_reader;
+    mram_reader_t bytes_reader;
 } terms_enum_frame_t;
 
 typedef struct _terms_enum_t {
-    mram_reader_t *in;
+    mram_reader_t in;
+    bool in_initialized;
 
     terms_enum_frame_t static_frame;
     terms_enum_frame_t *current_frame;

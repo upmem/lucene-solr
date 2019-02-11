@@ -21,7 +21,8 @@
 
 typedef struct {
     mram_reader_t *start_doc_in;
-    mram_reader_t *doc_in;
+    mram_reader_t doc_in;
+    bool doc_in_initialized;
 
     bool index_has_freq;
     bool index_has_pos;

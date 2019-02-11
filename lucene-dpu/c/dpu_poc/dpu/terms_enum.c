@@ -2,7 +2,7 @@
  * Copyright (c) 2014-2019 - uPmem
  */
 
-#include <stdlib.h>
+#include <defs.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -18,7 +18,7 @@
 #define OUTPUT_FLAG_IS_FLOOR 0x1
 #define OUTPUT_FLAG_HAS_TERMS 0x2
 
-static terms_enum_frame_t *push_frame_bytes_ref(terms_enum_t *terms_enum, arc_t *arc, bytes_ref_t *frame_data, uint32_t length);
+static terms_enum_frame_t *push_frame_bytes_ref(terms_enum_t *terms_enum, bytes_ref_t *frame_data, uint32_t length);
 static terms_enum_frame_t *get_frame(terms_enum_t *terms_enum, int32_t ord);
 static arc_t *get_arc(terms_enum_t *terms_enum, int32_t ord);
 
@@ -98,7 +98,7 @@ bool seek_exact(terms_enum_t *terms_enum, bytes_ref_t *target) {
         output = arc->output;
         terms_enum->current_frame = &terms_enum->static_frame;
         target_up_to = 0;
-        terms_enum->current_frame = push_frame_bytes_ref(terms_enum, arc, bytes_ref_add(output, arc->next_final_output),
+        terms_enum->current_frame = push_frame_bytes_ref(terms_enum, bytes_ref_add(output, arc->next_final_output),
                                                          0);
     }
 
@@ -137,7 +137,7 @@ bool seek_exact(terms_enum_t *terms_enum, bytes_ref_t *target) {
             target_up_to++;
 
             if (arc_is_final(arc)) {
-                terms_enum->current_frame = push_frame_bytes_ref(terms_enum, arc,
+                terms_enum->current_frame = push_frame_bytes_ref(terms_enum,
                                                                  bytes_ref_add(output, arc->next_final_output),
                                                                  target_up_to);
             }
@@ -164,8 +164,9 @@ bool seek_exact(terms_enum_t *terms_enum, bytes_ref_t *target) {
 }
 
 void init_index_input(terms_enum_t *terms_enum) {
-    if (terms_enum->in == NULL) {
-        terms_enum->in = mram_reader_clone(&terms_enum->field_reader->parent->terms_in);
+    if (!terms_enum->in_initialized) {
+        terms_enum->in_initialized = true;
+        mram_reader_fill(&terms_enum->in, &terms_enum->field_reader->parent->terms_in);
     }
 }
 
@@ -187,7 +188,7 @@ terms_enum_frame_t *push_frame_fp(terms_enum_t *terms_enum, uint32_t fp, uint32_
     return f;
 }
 
-static terms_enum_frame_t *push_frame_bytes_ref(terms_enum_t *terms_enum, arc_t *arc, bytes_ref_t *frame_data, uint32_t length) {
+static terms_enum_frame_t *push_frame_bytes_ref(terms_enum_t *terms_enum, bytes_ref_t *frame_data, uint32_t length) {
     wram_reader_t reader = {
             .buffer = frame_data->bytes,
             .index = frame_data->offset
@@ -212,7 +213,7 @@ static terms_enum_frame_t *push_frame_bytes_ref(terms_enum_t *terms_enum, arc_t 
 static terms_enum_frame_t *get_frame(terms_enum_t *terms_enum, int32_t ord) {
     if (ord >= terms_enum->stack_length) {
         if (ord >= MAX_STACK_LENGTH) {
-            abort();
+            halt();
         }
         for (int stack_ord = terms_enum->stack_length; stack_ord < ord + 1; ++stack_ord) {
             term_enum_frame_init(terms_enum->stack + stack_ord, terms_enum, stack_ord);
@@ -226,7 +227,7 @@ static terms_enum_frame_t *get_frame(terms_enum_t *terms_enum, int32_t ord) {
 static arc_t *get_arc(terms_enum_t *terms_enum, int32_t ord) {
     if (ord >= terms_enum->arcs_length) {
         if (ord >= MAX_ARCS_LENGTH) {
-            abort();
+            halt();
         }
         terms_enum->arcs_length = (uint32_t) (ord + 1);
     }
