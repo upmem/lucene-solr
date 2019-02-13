@@ -18,6 +18,5 @@ typedef struct {
 
 mram_cache_t *mram_cache_for(uint32_t task_id);
 uint32_t update_mram_cache(mram_cache_t *cache, mram_addr_t mram_addr);
-void mram_cache_init(uint32_t task_id);
 
 #endif //DPU_POC_MRAM_CACHE_H

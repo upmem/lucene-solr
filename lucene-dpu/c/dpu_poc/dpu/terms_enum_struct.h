@@ -7,9 +7,11 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "for_util.h"
+#include "field_info.h"
+#include <search_context.h>
 #include "wram_reader.h"
 #include "term_state.h"
-#include "term_reader.h"
 
 #define BLOCK_SIZE 128
 
@@ -68,14 +70,13 @@ typedef struct _terms_enum_frame_t {
 
 typedef struct _terms_enum_t {
     mram_reader_t in;
-    bool in_initialized;
 
     terms_enum_frame_t static_frame;
     terms_enum_frame_t *current_frame;
 
     int32_t target_before_current_length;
 
-    field_reader_t *field_reader;
+    flat_field_reader_t *field_reader;
     mram_reader_t fst_reader;
 
     arc_t arcs[MAX_ARCS_LENGTH];

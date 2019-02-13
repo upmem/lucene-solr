@@ -20,7 +20,7 @@ static bool next_frame_non_leaf(terms_enum_frame_t *frame);
 
 static void decode_term(int64_t *longs,
                         mram_reader_t *in,
-                        field_info_t *field_info,
+                        flat_field_info_t *field_info,
                         term_state_t *state,
                         bool absolute) {
     bool field_has_positions =
@@ -67,7 +67,7 @@ void decode_metadata(terms_enum_frame_t *frame) {
 
     while (frame->metadata_up_to < limit) {
         frame->state.doc_freq = mram_read_vint(&frame->stats_reader, false);
-        if (frame->ste->field_reader->field_info->index_options == INDEX_OPTIONS_DOCS) {
+        if (frame->ste->field_reader->field_info.index_options == INDEX_OPTIONS_DOCS) {
             frame->state.total_term_freq = frame->state.doc_freq;
         } else {
             frame->state.total_term_freq = frame->state.doc_freq + mram_read_vlong(&frame->stats_reader, false);
@@ -79,7 +79,7 @@ void decode_metadata(terms_enum_frame_t *frame) {
         for (int i = 0; i < frame->ste->field_reader->longs_size; ++i) {
             longs[i] = mram_read_vlong(&frame->bytes_reader, false);
         }
-        decode_term(longs, &frame->bytes_reader, frame->ste->field_reader->field_info, &frame->state, absolute);
+        decode_term(longs, &frame->bytes_reader, &frame->ste->field_reader->field_info, &frame->state, absolute);
         frame->metadata_up_to++;
         absolute = false;
     }
@@ -161,8 +161,6 @@ void load_next_floor_block(terms_enum_frame_t *frame) {
 }
 
 void load_block(terms_enum_frame_t *frame) {
-    init_index_input(frame->ste);
-
     if (frame->next_ent != -1) {
         return;
     }

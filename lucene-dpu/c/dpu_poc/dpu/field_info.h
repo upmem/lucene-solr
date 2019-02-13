@@ -28,39 +28,8 @@ typedef enum {
     INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS,
 } index_options_t;
 
-typedef struct {
-    char name[MAX_FIELD_SIZE];
-    uint32_t number;
-    doc_values_type_t doc_values_type;
-    bool store_term_vector;
-    bool omit_norms;
-    index_options_t index_options;
-    bool store_payloads;
-    // todo attributes
-    int64_t dv_gen;
-    int32_t point_data_dimension_count;
-    int32_t point_index_dimension_count;
-    int32_t point_num_bytes;
-    bool soft_deletes_field;
-} field_info_t;
-
-typedef struct {
-    bool has_freq;
-    bool has_prox;
-    bool has_payloads;
-    bool has_offsets;
-    bool has_vectors;
-    bool has_norms;
-    bool has_doc_values;
-    bool has_point_values;
-    char *soft_deletes_field;
-
-    field_info_t **by_number;
-    uint32_t by_number_length;
-} field_infos_t;
-
-int32_t compare_index_options(index_options_t first, index_options_t second);
-
-void read_field_infos(field_infos_t *field_infos, file_buffer_t *file);
+static inline int32_t compare_index_options(index_options_t first, index_options_t second) {
+    return ((int32_t) first) - ((int32_t) second);
+}
 
 #endif //DPU_POC_FIELD_INFO_H

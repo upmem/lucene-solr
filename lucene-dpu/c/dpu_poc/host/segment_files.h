@@ -8,17 +8,14 @@
 #include <stdint.h>
 
 typedef struct {
-    uint32_t length;
-    uint8_t* content;
-} segment_file_t;
+    uint32_t current_offset;
+    uint32_t nr_segments;
+    uint32_t nr_segments_max;
+    uint8_t *content;
+} mram_image_t;
 
-typedef struct {
-    segment_file_t si_file;
-    segment_file_t cfe_file;
-    segment_file_t cfs_file;
-} segment_files_t;
-
-segment_files_t* load_segment_files(const char* index_directory, uint32_t segment_number);
-void free_segment_files(segment_files_t* segment_files);
+mram_image_t *mram_image_new(uint32_t nr_segments_max);
+bool load_segment_files(mram_image_t *mram_image, const char* index_directory, uint32_t segment_number);
+void free_mram_image(mram_image_t *mram_image);
 
 #endif //DPU_POC_SEGMENT_FILES_H

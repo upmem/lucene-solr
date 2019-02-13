@@ -11,7 +11,7 @@ endif ()
 
 include(${UPMEM_HOME}/usr/share/upmem/cmake/include/host/DpuHost.cmake)
 
-file(GLOB SOURCES *.c)
+file(GLOB SOURCES *.c x86_process/*.c)
 
 set(DPU_PROJECT_RELATIVE_PATH ../dpu)
 set(DPU_BINARY ${CMAKE_CURRENT_BINARY_DIR}/${DPU_PROJECT_RELATIVE_PATH}/dpu)
@@ -20,7 +20,7 @@ set(DPU_HOST_LIBRARIES dpu-debug dpucni-debug)
 
 add_executable(dpuhost_poc ${SOURCES})
 target_compile_definitions(dpuhost_poc PUBLIC DPU_BINARY=${DPU_BINARY})
-target_link_libraries(dpuhost_poc ${DPU_HOST_LIBRARIES})
+target_link_libraries(dpuhost_poc ${DPU_HOST_LIBRARIES} m)
 target_include_directories(dpuhost_poc SYSTEM PUBLIC ${DPU_HOST_INCLUDE_DIRECTORIES})
 target_link_directories(dpuhost_poc PUBLIC ${DPU_HOST_LINK_DIRECTORIES})
 target_include_directories(dpuhost_poc PUBLIC ../commons)

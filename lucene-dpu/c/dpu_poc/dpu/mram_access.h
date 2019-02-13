@@ -12,8 +12,10 @@
 #define CACHE_SIZE_LOG 7
 #define CACHE_SIZE 128
 
+#define _CONCAT(x, y) x ## y
+#define MRAM_READ(to, from, length) _CONCAT(mram_read, length) (from, to)
+
 void read_query(query_t *query);
-void read_files_offsets(uint32_t index, uint32_t* offsets);
 void fetch_cache_line(uint8_t* cache, mram_addr_t mram_addr);
 
 #endif //DPU_POC_MRAM_ACCESS_H

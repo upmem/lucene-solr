@@ -10,7 +10,7 @@
 static uint32_t MAX_DATA_SIZE = 0xFFFFFFFF;
 #define math_max(x, y) (((x) > (y)) ? (x) : (y))
 
-static void initialize_max_data_size(for_util_t *for_util) {
+static void initialize_max_data_size(flat_for_util_t *for_util) {
     if (MAX_DATA_SIZE == 0xFFFFFFFF) {
         uint32_t max_data_size = 0;
         for (int i = 1; i <= 32; ++i) {
@@ -58,10 +58,10 @@ static postings_enum_t *postings_enum_reset(postings_enum_t *postings_enum, term
     return postings_enum;
 }
 
-void impacts(postings_enum_t *postings_enum, terms_enum_t *terms_enum, uint32_t flags, mram_reader_t *doc_reader, for_util_t *for_util) {
+void impacts(postings_enum_t *postings_enum, terms_enum_t *terms_enum, uint32_t flags, mram_reader_t *doc_reader, flat_for_util_t *for_util) {
     decode_metadata(terms_enum->current_frame);
 
-    field_info_t *field_info = terms_enum->field_reader->field_info;
+    flat_field_info_t *field_info = &terms_enum->field_reader->field_info;
     term_state_t *state = &terms_enum->current_frame->state;
 
     bool index_has_positions =
@@ -124,7 +124,7 @@ static void decode(packed_int_decoder_t *decoder,
     }
 }
 
-static void read_block(mram_reader_t *in, for_util_t *for_util, uint8_t *encoded, int32_t *decoded) {
+static void read_block(mram_reader_t *in, flat_for_util_t *for_util, uint8_t *encoded, int32_t *decoded) {
     uint32_t num_bits = mram_read_byte(in, false);
 
     if (num_bits == ALL_VALUES_EQUAL) {
@@ -148,7 +148,7 @@ static void read_block(mram_reader_t *in, for_util_t *for_util, uint8_t *encoded
     decode(decoder, encoded, 0, decoded, 0, iters);
 }
 
-static void skip_block(mram_reader_t *in, for_util_t *for_util) {
+static void skip_block(mram_reader_t *in, flat_for_util_t *for_util) {
     uint32_t num_bits = mram_read_byte(in, false);
 
     if (num_bits == ALL_VALUES_EQUAL) {

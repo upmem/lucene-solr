@@ -163,13 +163,6 @@ bool seek_exact(terms_enum_t *terms_enum, bytes_ref_t *target) {
     }
 }
 
-void init_index_input(terms_enum_t *terms_enum) {
-    if (!terms_enum->in_initialized) {
-        terms_enum->in_initialized = true;
-        mram_reader_fill(&terms_enum->in, &terms_enum->field_reader->parent->terms_in);
-    }
-}
-
 terms_enum_frame_t *push_frame_fp(terms_enum_t *terms_enum, uint32_t fp, uint32_t length) {
     terms_enum_frame_t *f = get_frame(terms_enum, 1 + terms_enum->current_frame->ord);
 

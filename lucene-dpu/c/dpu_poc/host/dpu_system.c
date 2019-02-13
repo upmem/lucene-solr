@@ -10,8 +10,6 @@
 #include "dpu_system.h"
 
 static bool load_query(dpu_system_t *dpu_system, const char *field, const char *value);
-static bool load_file_at(dpu_t dpu, mram_addr_t offset, segment_file_t *file);
-static bool load_file_indices_at(dpu_t dpu, mram_addr_t offset, mram_addr_t si_addr, mram_addr_t cfe_addr, mram_addr_t cfs_addr);
 static bool process_results(dpu_system_t *dpu_system);
 static bool save_mram(dpu_system_t *dpu_system, const char* path);
 
@@ -56,15 +54,13 @@ void free_dpu_system(dpu_system_t *dpu_system) {
     free(dpu_system);
 }
 
-bool prepare_mrams_with_segments(dpu_system_t *dpu_system, segment_files_t *segment_files) {
-    mram_addr_t si_file_offset = FILES_SUMMARY_BUFFER_OFFSET + FILES_SUMMARY_BUFFER_SIZE;
-    mram_addr_t cfe_file_offset = DMA_ALIGNED(si_file_offset + segment_files->si_file.length);
-    mram_addr_t cfs_file_offset = DMA_ALIGNED(cfe_file_offset + segment_files->cfe_file.length);
+bool prepare_mrams_with_segments(dpu_system_t *dpu_system, mram_image_t *mram_image) {
+    if (dpu_copy_to_individual(dpu_system->dpu, mram_image->content, 0, mram_image->current_offset) != DPU_API_SUCCESS) {
+        fprintf(stderr, "error when loading a mram image\n");
+        return false;
+    }
 
-    return load_file_at(dpu_system->dpu, si_file_offset, &segment_files->si_file) &&
-            load_file_at(dpu_system->dpu, cfe_file_offset, &segment_files->cfe_file) &&
-            load_file_at(dpu_system->dpu, cfs_file_offset, &segment_files->cfs_file) &&
-            load_file_indices_at(dpu_system->dpu, FILES_SUMMARY_BUFFER_OFFSET, si_file_offset, cfe_file_offset, cfs_file_offset);
+    return true;
 }
 
 bool search(dpu_system_t *dpu_system, const char *field, const char *value, bool save_memory_image) {
@@ -80,7 +76,7 @@ bool search(dpu_system_t *dpu_system, const char *field, const char *value, bool
 
     if (dpu_boot_individual(dpu_system->dpu, SYNCHRONOUS) != DPU_API_SUCCESS) {
         fprintf(stderr, "error during DPU execution\n");
-//        dpu_gather_postmortem_information(dpu_system->dpu, stdout);
+        dpu_gather_postmortem_information(dpu_system->dpu, stdout);
         dpulog_read_for_dpu(dpu_system->dpu, stdout);
         return false;
     }
@@ -116,26 +112,6 @@ static bool load_query(dpu_system_t *dpu_system, const char *field, const char *
     }
     if (dpu_copy_to_individual(dpu_system->dpu, value, QUERY_BUFFER_OFFSET + MAX_FIELD_SIZE, value_length + 1) != DPU_API_SUCCESS) {
         fprintf(stderr, "error when loading the query value\n");
-        return false;
-    }
-
-    return true;
-}
-
-static bool load_file_at(dpu_t dpu, mram_addr_t offset, segment_file_t* file) {
-    if (dpu_copy_to_individual(dpu, file->content, offset, file->length) != DPU_API_SUCCESS) {
-        fprintf(stderr, "error when loading a segment file\n");
-        return false;
-    }
-
-    return true;
-}
-
-static bool load_file_indices_at(dpu_t dpu, mram_addr_t offset, mram_addr_t si_addr, mram_addr_t cfe_addr, mram_addr_t cfs_addr) {
-    mram_addr_t addresses[3] = { si_addr, cfe_addr, cfs_addr };
-
-    if (dpu_copy_to_individual(dpu, (uint8_t*) addresses, offset, sizeof(addresses)) != DPU_API_SUCCESS) {
-        fprintf(stderr, "error when loading segment file indices\n");
         return false;
     }
 

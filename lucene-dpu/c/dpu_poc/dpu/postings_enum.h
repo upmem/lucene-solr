@@ -48,10 +48,10 @@ typedef struct {
 
     uint8_t encoded[MAX_ENCODED_SIZE];
 
-    for_util_t *for_util;
+    flat_for_util_t *for_util;
 } postings_enum_t;
 
-void impacts(postings_enum_t *postings_enum, terms_enum_t *terms_enum, uint32_t flags, mram_reader_t *doc_reader, for_util_t *for_util);
+void impacts(postings_enum_t *postings_enum, terms_enum_t *terms_enum, uint32_t flags, mram_reader_t *doc_reader, flat_for_util_t *for_util);
 
 int32_t postings_next_doc(postings_enum_t *postings_enum);
 

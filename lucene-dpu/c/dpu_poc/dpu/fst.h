@@ -16,6 +16,8 @@ typedef enum {
     INPUT_TYPE_BYTE4
 } input_type_t;
 
+#include "fst_struct.h"
+
 typedef struct {
     int32_t label;
     bytes_ref_t *output;
@@ -29,22 +31,9 @@ typedef struct {
     int32_t num_arcs;
 } arc_t;
 
-typedef struct {
-    // todo bytesArray
-    bytes_ref_t *empty_output;
-    int32_t start_node;
-    arc_t **cached_root_arcs;
-    uint32_t cached_root_arcs_length;
-    input_type_t input_type;
-
-    mram_addr_t mram_start_offset;
-    uint32_t mram_length;
-} fst_t;
-
 bool arc_is_final(arc_t *arc);
 bool arc_is_last(arc_t *arc);
-arc_t *get_first_arc(fst_t *fst, arc_t *arc);
-arc_t *find_target_arc(fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, mram_reader_t *in);
-void fst_fill(fst_t *fst, mram_reader_t *from, uint32_t index_start_fp);
+arc_t *get_first_arc(flat_fst_t *fst, arc_t *arc);
+arc_t *find_target_arc(flat_fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, mram_reader_t *in);
 
 #endif //DPU_POC_FST_H

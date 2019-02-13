@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include "fst.h"
 #include "alloc_wrapper.h"
-#include "index_header.h"
 
 #define END_LABEL (-1)
 
@@ -23,17 +22,15 @@
 
 #define ARCS_AS_FIXED_ARRAY BIT_ARC_HAS_FINAL_OUTPUT
 
-static arc_t *_find_target_arc(fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, mram_reader_t *in, bool use_root_arc_cache);
-static arc_t *copy_arc_from(arc_t *arc, arc_t *other);
-static int32_t read_label(fst_t *fst, mram_reader_t *in);
-static arc_t *read_first_real_target_arc(fst_t *fst, int32_t address, arc_t *arc, mram_reader_t *in);
-static arc_t *read_next_real_arc(fst_t *fst, arc_t *arc, mram_reader_t *in);
+static arc_t *_find_target_arc(flat_fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, mram_reader_t *in, bool use_root_arc_cache);
+static int32_t read_label(flat_fst_t *fst, mram_reader_t *in);
+static arc_t *read_first_real_target_arc(flat_fst_t *fst, int32_t address, arc_t *arc, mram_reader_t *in);
+static arc_t *read_next_real_arc(flat_fst_t *fst, arc_t *arc, mram_reader_t *in);
 static bytes_ref_t *read_output(mram_reader_t *in);
 static bytes_ref_t *read_final_output(mram_reader_t *in);
 static void skip_output(mram_reader_t *in);
 static void skip_final_output(mram_reader_t *in);
-static void seek_to_next_node(fst_t *fst, mram_reader_t *in);
-static void cache_root_arcs(fst_t *fst);
+static void seek_to_next_node(flat_fst_t *fst, mram_reader_t *in);
 
 static inline bool flag_is_set(uint8_t flags, uint8_t bit) {
     return (flags & bit) != 0;
@@ -47,7 +44,7 @@ bool arc_is_last(arc_t *arc) {
     return flag_is_set(arc->flags, BIT_LAST_ARC);
 }
 
-arc_t *get_first_arc(fst_t *fst, arc_t *arc) {
+arc_t *get_first_arc(flat_fst_t *fst, arc_t *arc) {
     bytes_ref_t *NO_OUTPUT = (bytes_ref_t *) &EMPTY_BYTES;
 
     if (fst->empty_output != NULL) {
@@ -67,83 +64,11 @@ arc_t *get_first_arc(fst_t *fst, arc_t *arc) {
     return arc;
 }
 
-arc_t *find_target_arc(fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, mram_reader_t *in) {
+arc_t *find_target_arc(flat_fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, mram_reader_t *in) {
     return _find_target_arc(fst, label_to_match, follow, arc, in, true);
 }
 
-void fst_fill(fst_t *fst, mram_reader_t *from, uint32_t index_start_fp) {
-    mram_reader_t in;
-    mram_reader_fill(&in, from);
-    set_index(&in, index_start_fp);
-
-    check_header(&in);
-
-    if (mram_read_byte(&in, false) == 1) {
-        int32_t num_bytes = mram_read_vint(&in, false);
-
-        if (num_bytes <= 0) {
-            fst->empty_output = (bytes_ref_t *) &EMPTY_BYTES;
-        } else {
-            mram_skip_bytes(&in, num_bytes - 1, false);
-
-            fst->empty_output = read_final_output(&in);
-
-            mram_skip_bytes(&in, num_bytes + 1, false);
-        }
-    } else {
-        fst->empty_output = NULL;
-    }
-
-    uint8_t t = mram_read_byte(&in, false);
-    switch (t) {
-        case 0:
-            fst->input_type = INPUT_TYPE_BYTE1;
-            break;
-        case 1:
-            fst->input_type = INPUT_TYPE_BYTE2;
-            break;
-        case 2:
-            fst->input_type = INPUT_TYPE_BYTE4;
-            break;
-        default:
-            halt();
-    }
-    fst->start_node = mram_read_false_vlong(&in, false);
-    uint32_t num_bytes = mram_read_false_vlong(&in, false);
-
-    fst->mram_start_offset = in.index;
-    fst->mram_length = num_bytes;
-
-    mram_skip_bytes(&in, num_bytes, false);
-
-    cache_root_arcs(fst);
-}
-
-static void cache_root_arcs(fst_t *fst) {
-    // todo: currently caching is disabled
-
-    fst->cached_root_arcs = NULL;
-    fst->cached_root_arcs_length = 0;
-}
-
-static arc_t *copy_arc_from(arc_t *arc, arc_t *other) {
-    arc->label = other->label;
-    arc->target = other->target;
-    arc->flags = other->flags;
-    arc->output = other->output;
-    arc->next_final_output = other->next_final_output;
-    arc->next_arc = other->next_arc;
-    arc->bytes_per_arc = other->bytes_per_arc;
-
-    if (arc->bytes_per_arc != 0) {
-        arc->pos_arcs_start = other->pos_arcs_start;
-        arc->arc_idx = other->arc_idx;
-        arc->num_arcs = other->num_arcs;
-    }
-    return arc;
-}
-
-static arc_t *_find_target_arc(fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, mram_reader_t *in, bool use_root_arc_cache) {
+static arc_t *_find_target_arc(flat_fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, mram_reader_t *in, bool use_root_arc_cache) {
     if (label_to_match == END_LABEL) {
         if (arc_is_final(follow)) {
             if (follow->target <= 0) {
@@ -157,18 +82,6 @@ static arc_t *_find_target_arc(fst_t *fst, int32_t label_to_match, arc_t *follow
             return arc;
         } else {
             return NULL;
-        }
-    }
-
-    if (use_root_arc_cache && (fst->cached_root_arcs != NULL) && (follow->target == fst->start_node) &&
-        (label_to_match < fst->cached_root_arcs_length)) {
-        arc_t *result = fst->cached_root_arcs[label_to_match];
-
-        if (result == NULL) {
-            return NULL;
-        } else {
-            copy_arc_from(arc, result);
-            return arc;
         }
     }
 
@@ -218,7 +131,7 @@ static arc_t *_find_target_arc(fst_t *fst, int32_t label_to_match, arc_t *follow
     }
 }
 
-static int32_t read_label(fst_t *fst, mram_reader_t *in) {
+static int32_t read_label(flat_fst_t *fst, mram_reader_t *in) {
     int32_t v;
 
     if (fst->input_type == INPUT_TYPE_BYTE1) {
@@ -232,7 +145,7 @@ static int32_t read_label(fst_t *fst, mram_reader_t *in) {
     return v;
 }
 
-static arc_t *read_first_real_target_arc(fst_t *fst, int32_t address, arc_t *arc, mram_reader_t *in) {
+static arc_t *read_first_real_target_arc(flat_fst_t *fst, int32_t address, arc_t *arc, mram_reader_t *in) {
     set_index(in, (uint32_t) address);
 
     if (mram_read_byte(in, true) == ARCS_AS_FIXED_ARRAY) {
@@ -248,7 +161,7 @@ static arc_t *read_first_real_target_arc(fst_t *fst, int32_t address, arc_t *arc
     return read_next_real_arc(fst, arc, in);
 }
 
-static arc_t *read_next_real_arc(fst_t *fst, arc_t *arc, mram_reader_t *in) {
+static arc_t *read_next_real_arc(flat_fst_t *fst, arc_t *arc, mram_reader_t *in) {
     if (arc->bytes_per_arc != 0) {
         arc->arc_idx++;
         set_index(in, (uint32_t) arc->pos_arcs_start);
@@ -328,7 +241,7 @@ static void skip_final_output(mram_reader_t *in) {
     skip_output(in);
 }
 
-static void seek_to_next_node(fst_t *fst, mram_reader_t *in) {
+static void seek_to_next_node(flat_fst_t *fst, mram_reader_t *in) {
     while (true) {
         uint8_t flags = mram_read_byte(in, true);
         read_label(fst, in);

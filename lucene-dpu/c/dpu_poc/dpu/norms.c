@@ -4,91 +4,7 @@
 #include "norms.h"
 #include "alloc_wrapper.h"
 
-static bool hasNorms(field_info_t *field_info) {
-    return field_info->index_options != INDEX_OPTIONS_NONE && field_info->omit_norms == false;
-}
-
-static norms_entry_t **readFields_rec(mram_reader_t *norms_metadata,
-                                      uint32_t max_field_info_number,
-                                      field_infos_t *field_infos) {
-    int32_t fieldNumber = mram_read_int(norms_metadata, false);
-    norms_entry_t **norms_field_map;
-    norms_entry_t *curr_field;
-    field_info_t *field_info;
-    uint32_t field_info_number;
-
-
-    if (fieldNumber == -1) {
-        size_t size = (max_field_info_number + 1) * sizeof(norms_entry_t *);
-        norms_entry_t** result = (norms_entry_t **) malloc(size);
-        memset(result, 0, size);
-        return result;
-    }
-    curr_field = malloc(sizeof(norms_entry_t));
-
-    field_info = field_infos->by_number[fieldNumber];
-    field_info_number = field_info->number;
-    if (field_info == NULL || !hasNorms(field_info)) {
-        halt();
-    }
-
-    curr_field->docsWithFieldOffset = mram_read_long(norms_metadata, false);
-    curr_field->docsWithFieldLength = mram_read_long(norms_metadata, false);
-    curr_field->jumpTableEntryCount = mram_read_short(norms_metadata, false);
-    curr_field->denseRankPower = mram_read_byte(norms_metadata, false);
-    curr_field->numDocsWithField = mram_read_int(norms_metadata, false);
-    curr_field->bytesPerNorm = mram_read_byte(norms_metadata, false);
-    curr_field->normsOffset = mram_read_long(norms_metadata, false);
-
-    if (!(curr_field->bytesPerNorm == 1
-          || curr_field->bytesPerNorm == 2
-          || curr_field->bytesPerNorm == 4
-          || curr_field->bytesPerNorm == 8)) {
-        halt();
-    }
-
-    if (field_info_number > max_field_info_number) {
-        max_field_info_number = field_info_number;
-    }
-
-    norms_field_map = readFields_rec(norms_metadata, max_field_info_number, field_infos);
-
-    if (norms_field_map[field_info_number] != NULL) {
-        halt();
-    }
-    norms_field_map[field_info_number] = curr_field;
-    return norms_field_map;
-}
-
-
-norms_reader_t *norms_reader_new(file_buffer_t *buffer_norms_metadata, file_buffer_t *buffer_norms_data,
-        field_infos_t *field_infos) {
-    norms_reader_t *reader = malloc(sizeof(norms_reader_t));
-
-    mram_cache_t *cache = mram_cache_for(me());
-
-    mram_reader_t norms_metadata = {
-            .index = buffer_norms_metadata->offset,
-            .base = buffer_norms_metadata->offset,
-            .cache = cache,
-    };
-
-    index_header_t index_header;
-    read_index_header(&index_header, &norms_metadata);
-
-    reader->norms_entries = readFields_rec(&norms_metadata, 0, field_infos);
-
-    reader->norms_data.index = buffer_norms_data->offset;
-    reader->norms_data.base = buffer_norms_data->offset;
-    reader->norms_data.cache = cache;
-    reader->norms_data_length = buffer_norms_data->length;
-
-    return reader;
-}
-
-uint64_t getNorms(norms_reader_t *reader, uint32_t field_number, int doc) {
-    norms_entry_t *entry = reader->norms_entries[field_number];
-
+uint64_t getNorms(flat_norms_entry_t *entry, uint32_t doc, mram_reader_t* norms_data) {
     if (entry->docsWithFieldOffset == -2) {
         return 0;
     } else if (entry->docsWithFieldOffset == -1) {
@@ -96,7 +12,7 @@ uint64_t getNorms(norms_reader_t *reader, uint32_t field_number, int doc) {
             return entry->normsOffset;
         }
         mram_reader_t slice;
-        mram_reader_fill(&slice, &reader->norms_data);
+        mram_reader_fill(&slice, norms_data);
         mram_skip_bytes(&slice, entry->normsOffset, false);
         mram_skip_bytes(&slice, doc * entry->bytesPerNorm, false);
         switch (entry->bytesPerNorm) {

@@ -1,6 +1,7 @@
 #include <dpu.h>
 #include <stdlib.h>
 #include <libgen.h>
+#include <dpu_characteristics.h>
 #include "segment_files.h"
 #include "dpu_system.h"
 
@@ -31,20 +32,26 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    segment_files_t *segment_files = load_segment_files(index_directory, segment_number);
+    mram_image_t *mram_image = mram_image_new(NR_THREADS);
 
-    if (segment_files == NULL) {
+    if (mram_image == NULL) {
         free_dpu_system(dpu_system);
         return 1;
     }
 
-    if (!prepare_mrams_with_segments(dpu_system, segment_files)) {
-        free_segment_files(segment_files);
+    if (!load_segment_files(mram_image, index_directory, segment_number)) {
+        free_mram_image(mram_image);
         free_dpu_system(dpu_system);
         return 1;
     }
 
-    free_segment_files(segment_files);
+    if (!prepare_mrams_with_segments(dpu_system, mram_image)) {
+        free_mram_image(mram_image);
+        free_dpu_system(dpu_system);
+        return 1;
+    }
+
+    free_mram_image(mram_image);
 
     search(dpu_system, "contents", "apache", true);
 //    search(dpu_system, "contents", "patent", true);

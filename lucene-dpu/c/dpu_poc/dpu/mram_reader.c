@@ -71,11 +71,6 @@ uint64_t mram_read_long(mram_reader_t *reader, bool decrement) {
             (((uint64_t) mram_read_int(reader, decrement)) & 0xffffffffl);
 }
 
-uint32_t mram_read_false_long(mram_reader_t *reader, bool decrement) {
-    mram_skip_bytes(reader, 4, decrement);
-    return mram_read_int(reader, decrement);
-}
-
 uint64_t mram_read_vlong(mram_reader_t *reader, bool decrement) {
     // todo something more efficient?
     uint8_t b = mram_read_byte(reader, decrement);
