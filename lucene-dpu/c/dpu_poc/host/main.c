@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    mram_image_t *mram_image = mram_image_new(NR_THREADS);
+    mram_image_t *mram_image = mram_image_new();
 
     if (mram_image == NULL) {
         free_dpu_system(dpu_system);

@@ -10,11 +10,10 @@
 typedef struct {
     uint32_t current_offset;
     uint32_t nr_segments;
-    uint32_t nr_segments_max;
     uint8_t *content;
 } mram_image_t;
 
-mram_image_t *mram_image_new(uint32_t nr_segments_max);
+mram_image_t *mram_image_new();
 bool load_segment_files(mram_image_t *mram_image, const char* index_directory, uint32_t segment_number);
 void free_mram_image(mram_image_t *mram_image);
 

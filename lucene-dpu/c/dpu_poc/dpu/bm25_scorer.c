@@ -1,11 +1,11 @@
 #include <stdint.h>
 #include <defs.h>
 
+#include "dpu_outputs.h"
+
 #define K (1.2f)
 #define B (0.75f)
 
-/* shift from zero for result of compute_bm25 */
-#define PRECISION_SHIFT (10)
 /* precision of the log function (already taken into account in "cache_log")*/
 #define LOG_PRECISION_SHIFT (10)
 #define LOG_PRECISION (1 << LOG_PRECISION_SHIFT)
@@ -847,7 +847,7 @@ long long compute_bm25(uint32_t doc_count,
     long long den = (ft << LOG_PRECISION_SHIFT)
         + ((long long)(LOG_PRECISION * K * (1 -B))) * total_term_freq
         + ((long long)(LOG_PRECISION * K * B     )) * doc_count * (long long)cache_norm[doc_norm & 0xFF];
-    return (num << PRECISION_SHIFT) / den;
+    return (num << SCORE_PRECISION_SHIFT) / den;
 }
 
 /* void generate_cache_log_idx() */

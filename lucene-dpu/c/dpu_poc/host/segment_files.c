@@ -16,13 +16,12 @@ typedef void mram_cache_t;
 #include <mram_structure.h>
 #include "segment_files.h"
 
-mram_image_t *mram_image_new(uint32_t nr_segments_max) {
+mram_image_t *mram_image_new() {
     mram_image_t *image = malloc(sizeof(*image));
 
     image->content = malloc(MRAM_SIZE);
     image->nr_segments = 0;
-    image->nr_segments_max = nr_segments_max;
-    image->current_offset = SEGMENT_SUMMARY_OFFSET + nr_segments_max * SEGMENT_SUMMARY_ENTRY_SIZE;
+    image->current_offset = SEGMENTS_OFFSET;
     memset(image->content + QUERY_BUFFER_OFFSET, 0, QUERY_BUFFER_SIZE);
 
     return image;
@@ -34,7 +33,7 @@ void free_mram_image(mram_image_t *mram_image) {
 }
 
 bool load_segment_files(mram_image_t *mram_image, const char* index_directory, uint32_t segment_number) {
-    if (mram_image->nr_segments == mram_image->nr_segments_max) {
+    if (mram_image->nr_segments == NR_THREADS) {
         return false;
     }
 
