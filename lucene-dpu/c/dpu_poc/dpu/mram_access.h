@@ -14,6 +14,7 @@
 
 #define _CONCAT(x, y) x ## y
 #define MRAM_READ(to, from, length) _CONCAT(mram_read, length) (from, to)
+#define MRAM_WRITE(from, to, length) _CONCAT(mram_write, length) (to, from)
 
 void read_query(query_t *query);
 void fetch_cache_line(uint8_t* cache, mram_addr_t mram_addr);

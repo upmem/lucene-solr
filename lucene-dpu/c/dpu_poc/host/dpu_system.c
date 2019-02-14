@@ -118,9 +118,27 @@ static bool load_query(dpu_system_t *dpu_system, const char *field, const char *
     return true;
 }
 
+#define NR_TOTAL_OUTPUT (NR_THREADS * OUTPUTS_PER_THREAD)
 static bool process_results(dpu_system_t *dpu_system) {
-    // todo
-    return false;
+    dpu_output_t *results = (dpu_output_t *)malloc(NR_TOTAL_OUTPUT * sizeof(dpu_output_t));
+    if (dpu_copy_from_individual(dpu_system->dpu, 0, (uint8_t *)results, sizeof(dpu_output_t) * NR_TOTAL_OUTPUT) != DPU_API_SUCCESS) {
+        fprintf(stderr, "error when reading the results\n");
+        free(results);
+        return false;
+    }
+    unsigned int each_thread;
+    for (each_thread = 0; each_thread < NR_THREADS; each_thread++) {
+        dpu_output_t *curr_result = &results[each_thread * OUTPUTS_PER_THREAD];
+        while (curr_result->doc_id != 0xffffffff) {
+            printf("[%u] doc:%u \tscore:%f\n",
+                   each_thread,
+                   curr_result->doc_id,
+                   ((float)curr_result->score) / ((float)SCORE_PRECISION));
+            curr_result++;
+        }
+    }
+    free(results);
+    return true;
 }
 
 static bool save_mram(dpu_system_t *dpu_system, const char* path) {

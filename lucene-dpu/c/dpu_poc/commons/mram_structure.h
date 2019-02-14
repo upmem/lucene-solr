@@ -7,15 +7,17 @@
 
 #include <stdint.h>
 #include "query.h"
-#include "dpu_outputs.h"
+#include "dpu_output.h"
 #include "dpu_characteristics.h"
 
 #define MRAM_SIZE (1 << 26)
 
 #define OUTPUTS_PER_THREAD (64*1024)
 #define OUTPUTS_BUFFER_OFFSET (0)
-#define OUTPUTS_BUFFER_SIZE_PER_THREAD (OUTPUTS_PER_THREAD * sizeof(dpu_outputs_t))
+#define OUTPUT_SIZE 16
+#define OUTPUTS_BUFFER_SIZE_PER_THREAD (OUTPUTS_PER_THREAD * OUTPUT_SIZE)
 #define OUTPUTS_BUFFER_SIZE (OUTPUTS_BUFFER_SIZE_PER_THREAD * NR_THREADS)
+_Static_assert(sizeof(dpu_output_t) == 16, "check that OUTPUT_SIZE matches the effective size of dpu_ouput_t");
 
 #define QUERY_BUFFER_OFFSET (OUTPUTS_BUFFER_OFFSET + OUTPUTS_BUFFER_SIZE)
 #define QUERY_BUFFER_SIZE 32

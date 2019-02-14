@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <defs.h>
 
-#include "dpu_outputs.h"
+#include "dpu_output.h"
 
 #define K (1.2f)
 #define B (0.75f)
