@@ -1030,7 +1030,7 @@ for_util_t *build_for_util(data_input_t *doc_in) {
                 break;
             default:
                 // todo other formats...
-                fprintf(stderr, "format with id %d is not implemented (num_bits = %d)\n", format_id, i);
+                /* fprintf(stderr, "format with id %d is not implemented (num_bits = %d)\n", format_id, i); */
                 for_util->setup_done[i] = false;
                 continue;
         }

@@ -127,6 +127,7 @@ static bool process_results(dpu_system_t *dpu_system) {
         return false;
     }
     unsigned int each_thread;
+    printf("######## RESULTS #########\n");
     for (each_thread = 0; each_thread < NR_THREADS; each_thread++) {
         dpu_output_t *curr_result = &results[each_thread * OUTPUTS_PER_THREAD];
         while (curr_result->doc_id != 0xffffffff) {

@@ -75,8 +75,8 @@ static void generate_file_buffers_from_cfs(char *path,
     assert(f_cfe != NULL && "CFE FILE NOT FOUND");
 
     cfe_file = parse_cfe_file(f_cfe);
-    printf("\n######### CFE_FILE #########\n\n");
-    print_cfe_file(cfe_file);
+    /* printf("\n######### CFE_FILE #########\n\n"); */
+    /* print_cfe_file(cfe_file); */
 
     fclose(f_cfe);
 
@@ -115,8 +115,8 @@ file_buffer_t *get_file_buffers(char *path, unsigned int segment_id) {
     f_si = fopen(filename, "r");
     assert(f_si != NULL && "SI FILE NOT FOUND");
     si_file = parse_si_file(f_si);
-    printf("\n######### SI_FILE #########\n\n");
-    print_si_file(si_file);
+    /* printf("\n######### SI_FILE #########\n\n"); */
+    /* print_si_file(si_file); */
     fclose(f_si);
 
     if (si_file->IsCompoundFile) {

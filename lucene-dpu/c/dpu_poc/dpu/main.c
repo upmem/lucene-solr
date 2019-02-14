@@ -29,7 +29,7 @@ int main(void) {
     search(context, query->field, query->value);
     end = perfcounter_get();
 
-    ktrace("[%i] %u\n", task_id, (unsigned)(end - start));
+    ktrace("[%i] perfcounter:%u\n", task_id, (unsigned)(end - start));
 
     return 0;
 }
