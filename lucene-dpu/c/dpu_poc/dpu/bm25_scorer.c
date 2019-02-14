@@ -822,6 +822,7 @@ static int compute_log_idx(int val)
         }
     }
     halt();
+    return 0;
 }
 
 static int compute_log(int val, int plus)

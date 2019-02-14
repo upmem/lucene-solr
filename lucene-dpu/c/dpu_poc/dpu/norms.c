@@ -30,4 +30,5 @@ uint64_t getNorms(flat_norms_entry_t *entry, uint32_t doc, mram_reader_t* norms_
     } else {
         halt();
     }
+    return 0;
 }
