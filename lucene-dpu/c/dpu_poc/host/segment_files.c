@@ -122,7 +122,7 @@ bool load_segment_files(mram_image_t *mram_image, const char* index_directory, u
         fst_contents_offset += field_reader->index->bytes_array_length;
 
         *((uint32_t*) (mram_image->content + empty_outputs_offset)) = field_reader->index->empty_output->length;
-        memcpy(mram_image + empty_outputs_offset + sizeof(uint32_t), field_reader->index->empty_output->bytes, field_reader->index->empty_output->length);
+        memcpy(mram_image->content + empty_outputs_offset + sizeof(uint32_t), field_reader->index->empty_output->bytes, field_reader->index->empty_output->length);
         empty_outputs_offset += sizeof(uint32_t) + ((field_reader->index->empty_output->length + 3) & ~3);
         memcpy(mram_image->content + mram_image->current_offset, &flat_reader, sizeof(flat_reader));
         mram_image->current_offset += DMA_ALIGNED(sizeof(flat_field_reader_t));
@@ -137,19 +137,21 @@ bool load_segment_files(mram_image_t *mram_image, const char* index_directory, u
     search_context->term_reader.terms_in.index = mram_image->current_offset;
     search_context->term_reader.terms_in.base = mram_image->current_offset;
     search_context->term_reader.terms_in.cache = DPU_NULL;
-    mram_image->current_offset += global_context->term_reader->terms_in->size;
+    mram_image->current_offset += DMA_ALIGNED(global_context->term_reader->terms_in->size);
 
     memcpy(mram_image->content + mram_image->current_offset, global_context->doc_in->buffer, global_context->doc_in->size);
     search_context->doc_reader.index = mram_image->current_offset;
     search_context->doc_reader.base = mram_image->current_offset;
     search_context->doc_reader.cache = DPU_NULL;
-    mram_image->current_offset += global_context->doc_in->size;
+    mram_image->current_offset += DMA_ALIGNED(global_context->doc_in->size);
 
     memcpy(mram_image->content + mram_image->current_offset, global_context->norms_reader->norms_data->buffer, global_context->norms_reader->norms_data->size);
     search_context->norms_data.index = mram_image->current_offset;
     search_context->norms_data.base = mram_image->current_offset;
     search_context->norms_data.cache = DPU_NULL;
-    mram_image->current_offset += global_context->norms_reader->norms_data->size;
+    mram_image->current_offset += DMA_ALIGNED(global_context->norms_reader->norms_data->size);
+
+    mram_image->nr_segments++;
 
     return true;
 }

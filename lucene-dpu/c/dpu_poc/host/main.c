@@ -39,10 +39,13 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (!load_segment_files(mram_image, index_directory, segment_number)) {
-        free_mram_image(mram_image);
-        free_dpu_system(dpu_system);
-        return 1;
+    unsigned each_thread;
+    for (each_thread = 0; each_thread < NR_THREADS; each_thread++) {
+        if (!load_segment_files(mram_image, index_directory, segment_number)) {
+            free_mram_image(mram_image);
+            free_dpu_system(dpu_system);
+            return 1;
+        }
     }
 
     if (!prepare_mrams_with_segments(dpu_system, mram_image)) {
