@@ -8,6 +8,7 @@
 
 #include "context.h"
 #include "search.h"
+#include "job_load_balancing.h"
 
 int main(void) {
     query_t *query;
@@ -17,6 +18,7 @@ int main(void) {
 
     // initialize_context is long enough for task#0 to initialize the query before any other task needs it
     if (task_id == 0) {
+        init_scoring_job_producers();
         query = fetch_query(true);
         perfcounter_config(COUNT_CYCLES, true);
         context = initialize_flat_context(task_id);

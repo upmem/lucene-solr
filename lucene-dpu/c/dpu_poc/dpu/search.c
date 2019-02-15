@@ -5,8 +5,6 @@
 #include <defs.h>
 #include <stdlib.h>
 
-#include <ktrace.h>
-
 #include "mram_structure.h"
 #include "search.h"
 #include "bytes_ref.h"
@@ -15,6 +13,7 @@
 #include "context.h"
 #include "norms.h"
 #include "dpu_output.h"
+#include "job_load_balancing.h"
 
 static flat_norms_entry_t norms_entries[NR_THREADS];
 
@@ -33,7 +32,7 @@ void search(flat_search_context_t *ctx, uint32_t field_id, char *value) {
         postings_enum_t postings_enum;
         impacts(&postings_enum, terms_enum, POSTINGS_ENUM_FREQS, &ctx->doc_reader, &ctx->for_util);
 
-        flat_norms_entry_t* norms_entry = &norms_entries[task_id];
+        flat_norms_entry_t *norms_entry = &norms_entries[task_id];
         mram_readX(flat_context_offsets[task_id]
                    + sizeof(flat_search_context_t)
                    + sizeof(flat_norms_entry_t) * field_reader->field_info.number,
@@ -42,17 +41,47 @@ void search(flat_search_context_t *ctx, uint32_t field_id, char *value) {
 
         dpu_output_t output;
         while ((output.doc_id = postings_next_doc(&postings_enum)) != NO_MORE_DOCS) {
-            output.score = compute_bm25(field_reader->doc_count,
-                                        (uint32_t) doc_freq,
-                                        postings_enum.freq,
-                                        getNorms(norms_entry, output.doc_id, &ctx->norms_data),
-                                        field_reader->sum_total_term_freq);
-            MRAM_WRITE(OUTPUTS_BUFFER_OFFSET + task_id * OUTPUTS_BUFFER_SIZE_PER_THREAD + nb_output * OUTPUT_SIZE,
-                       &output,
-                       OUTPUT_SIZE);
-            nb_output++;
+            uint32_t doc_norm = (uint32_t) getNorms(norms_entry, output.doc_id, &ctx->norms_data);
+
+            bool added = add_scoring_job(output.doc_id, field_reader->doc_count, (uint32_t) doc_freq, postings_enum.freq,
+                                         doc_norm,
+                                         field_reader->sum_total_term_freq);
+
+            if (!added) {
+                output.score = compute_bm25(field_reader->doc_count,
+                                            (uint32_t) doc_freq,
+                                            postings_enum.freq,
+                                            doc_norm,
+                                            field_reader->sum_total_term_freq);
+                MRAM_WRITE(OUTPUTS_BUFFER_OFFSET + task_id * OUTPUTS_BUFFER_SIZE_PER_THREAD + nb_output * OUTPUT_SIZE,
+                           &output,
+                           OUTPUT_SIZE);
+                nb_output++;
+            }
+        }
+
+        remove_scoring_job_producer();
+
+        while (true) {
+            scoring_job_t *new_job = fetch_scoring_job();
+
+            if (new_job != NULL) {
+                output.doc_id = new_job->doc;
+                output.score = compute_bm25(new_job->doc_count,
+                                               new_job->doc_freq,
+                                               new_job->freq,
+                                               new_job->doc_norm,
+                                               new_job->sum_total_term_freq);
+                MRAM_WRITE(OUTPUTS_BUFFER_OFFSET + task_id * OUTPUTS_BUFFER_SIZE_PER_THREAD + nb_output * OUTPUT_SIZE,
+                           &output,
+                           OUTPUT_SIZE);
+                nb_output++;
+            } else if (!has_job_producers()) {
+                break;
+            }
         }
     }
+
     dpu_output_t last_output = {.score = 0xffffffffffffffffULL, .doc_id = 0xffffffffU};
     MRAM_WRITE(OUTPUTS_BUFFER_OFFSET + task_id * OUTPUTS_BUFFER_SIZE_PER_THREAD + nb_output * OUTPUT_SIZE,
                &last_output,
