@@ -45,7 +45,7 @@ void search(flat_search_context_t *ctx, uint32_t field_id, char *value) {
 
             bool added = add_scoring_job(output.doc_id, field_reader->doc_count, (uint32_t) doc_freq, postings_enum.freq,
                                          doc_norm,
-                                         field_reader->sum_total_term_freq);
+                                         field_reader->sum_total_term_freq, task_id, nb_output);
 
             if (!added) {
                 output.score = compute_bm25(field_reader->doc_count,
@@ -56,8 +56,9 @@ void search(flat_search_context_t *ctx, uint32_t field_id, char *value) {
                 MRAM_WRITE(OUTPUTS_BUFFER_OFFSET + task_id * OUTPUTS_BUFFER_SIZE_PER_THREAD + nb_output * OUTPUT_SIZE,
                            &output,
                            OUTPUT_SIZE);
-                nb_output++;
             }
+
+            nb_output++;
         }
 
         remove_scoring_job_producer();
@@ -72,10 +73,9 @@ void search(flat_search_context_t *ctx, uint32_t field_id, char *value) {
                                                new_job->freq,
                                                new_job->doc_norm,
                                                new_job->sum_total_term_freq);
-                MRAM_WRITE(OUTPUTS_BUFFER_OFFSET + task_id * OUTPUTS_BUFFER_SIZE_PER_THREAD + nb_output * OUTPUT_SIZE,
+                MRAM_WRITE(OUTPUTS_BUFFER_OFFSET + new_job->task_id * OUTPUTS_BUFFER_SIZE_PER_THREAD + new_job->output_id * OUTPUT_SIZE,
                            &output,
                            OUTPUT_SIZE);
-                nb_output++;
             } else if (!has_job_producers()) {
                 break;
             }

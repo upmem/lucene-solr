@@ -15,6 +15,8 @@ typedef struct {
     int32_t freq;
     uint32_t doc_norm;
     int64_t sum_total_term_freq;
+    uint32_t task_id;
+    uint32_t output_id;
 } scoring_job_t;
 
 bool add_scoring_job(int32_t doc,
@@ -22,7 +24,9 @@ bool add_scoring_job(int32_t doc,
                      uint32_t doc_freq,
                      int32_t freq,
                      uint32_t doc_norm,
-                     int64_t sum_total_term_freq);
+                     int64_t sum_total_term_freq,
+                     uint32_t task_id,
+                     uint32_t output_id);
 
 scoring_job_t *fetch_scoring_job(void);
 void init_scoring_job_producers(void);
