@@ -32,7 +32,11 @@ void free_mram_image(mram_image_t *mram_image) {
     free(mram_image);
 }
 
-bool load_segment_files(mram_image_t *mram_image, const char* index_directory, uint32_t segment_number) {
+bool load_segment_files(mram_image_t *mram_image,
+                        const char* index_directory,
+                        uint32_t segment_number,
+                        unsigned int *nb_field,
+                        char ***field_names) {
     if (mram_image->nr_segments == NR_THREADS) {
         return false;
     }
@@ -89,6 +93,9 @@ bool load_segment_files(mram_image_t *mram_image, const char* index_directory, u
 
     uint32_t fst_contents_offset = empty_outputs_offset + empty_output_length;
 
+    *nb_field = global_context->term_reader->nr_fields;
+    *field_names = (char **)malloc(*nb_field * sizeof(char *));
+
     for (int j = 0; j < global_context->term_reader->nr_fields; ++j) {
         field_reader_t* field_reader = global_context->term_reader->fields[j].field_reader;
         flat_field_reader_t flat_reader;
@@ -124,13 +131,15 @@ bool load_segment_files(mram_image_t *mram_image, const char* index_directory, u
         memcpy(mram_image->content + empty_outputs_offset + sizeof(uint32_t), field_reader->index->empty_output->bytes, field_reader->index->empty_output->length);
         empty_outputs_offset += sizeof(uint32_t) + ((field_reader->index->empty_output->length + 3) & ~3);
         memcpy(mram_image->content + mram_image->current_offset, &flat_reader, sizeof(flat_reader));
+
+        (*field_names)[j] = ((flat_field_reader_t *)(mram_image->content + mram_image->current_offset))->field_info.name;
+
         mram_image->current_offset += DMA_ALIGNED(sizeof(flat_field_reader_t));
     }
 
     mram_image->current_offset = DMA_ALIGNED(fst_contents_offset);
 
-    search_context->fields = DPU_NULL;
-    search_context->entries = DPU_NULL;
+    search_context->empty_outputs = DPU_NULL;
 
     memcpy(mram_image->content + mram_image->current_offset, global_context->term_reader->terms_in->buffer, global_context->term_reader->terms_in->size);
     search_context->term_reader.terms_in.index = mram_image->current_offset;

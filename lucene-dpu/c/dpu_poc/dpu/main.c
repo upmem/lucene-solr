@@ -26,7 +26,7 @@ int main(void) {
     }
 
     start = perfcounter_get();
-    search(context, query->field, query->value);
+    search(context, query->field_id, query->value);
     end = perfcounter_get();
 
     ktrace("[%i] perfcounter:%u\n", task_id, (unsigned)(end - start));

@@ -8,8 +8,9 @@
 #include <mram_structure.h>
 #include <dpulog.h>
 #include "dpu_system.h"
+#include "query.h"
 
-static bool load_query(dpu_system_t *dpu_system, const char *field, const char *value);
+static bool load_query(dpu_system_t *dpu_system, const char *field, const char *value, unsigned int *, char ***);
 static bool process_results(dpu_system_t *dpu_system);
 static bool save_mram(dpu_system_t *dpu_system, const char* path);
 
@@ -63,8 +64,13 @@ bool prepare_mrams_with_segments(dpu_system_t *dpu_system, mram_image_t *mram_im
     return true;
 }
 
-bool search(dpu_system_t *dpu_system, const char *field, const char *value, bool save_memory_image) {
-    if (!load_query(dpu_system, field, value)) {
+bool search(dpu_system_t *dpu_system,
+            const char *field,
+            const char *value,
+            bool save_memory_image,
+            unsigned int *nb_fields_per_thread,
+            char ***field_names_per_thread) {
+    if (!load_query(dpu_system, field, value, nb_fields_per_thread, field_names_per_thread)) {
         fprintf(stderr, "error when loading the query\n");
         return false;
     }
@@ -93,25 +99,43 @@ bool search(dpu_system_t *dpu_system, const char *field, const char *value, bool
     return true;
 }
 
-static bool load_query(dpu_system_t *dpu_system, const char *field, const char *value) {
-    size_t field_length = strlen(field);
+static bool load_query(dpu_system_t *dpu_system, const char *field, const char *value, unsigned int *nb_field, char ***field_names) {
     size_t value_length = strlen(value);
 
-    if (field_length >= MAX_FIELD_SIZE) {
-        fprintf(stderr, "specified query field is too big\n");
-        return false;
-    }
     if (value_length >= MAX_VALUE_SIZE) {
         fprintf(stderr, "specified query value is too big\n");
         return false;
     }
+    query_t query;
+    memcpy(&query.value, value, value_length);
+    query.value[value_length] = '\0';
 
-    if (dpu_copy_to_individual(dpu_system->dpu, field, QUERY_BUFFER_OFFSET, field_length + 1) != DPU_API_SUCCESS) {
-        fprintf(stderr, "error when loading the query field\n");
+    unsigned int each_field;
+    query.field_id = -1;
+    for (each_field = 0; each_field < nb_field[0]; each_field++) {
+        char *field_name = field_names[0][each_field];
+        if (field_name != NULL && strcmp(field, field_name) == 0) {
+            unsigned each_thread;
+
+            /* Check to make sure that every segment have the same field name at the same id */
+            for (each_thread = 0; each_thread < NR_THREADS; each_thread++) {
+                char *field_name = field_names[each_thread][each_field];
+                if (field_name == NULL || strcmp(field, field_name) != 0) {
+                    fprintf(stderr, "segment does not have the same field name for a field id\n");
+                    return false;
+                }
+            }
+
+            query.field_id = each_field;
+            break;
+        }
+    }
+    if (query.field_id == -1) {
+        fprintf(stderr, "error when looking for field id\n");
         return false;
     }
-    if (dpu_copy_to_individual(dpu_system->dpu, value, QUERY_BUFFER_OFFSET + MAX_FIELD_SIZE, value_length + 1) != DPU_API_SUCCESS) {
-        fprintf(stderr, "error when loading the query value\n");
+    if (dpu_copy_to_individual(dpu_system->dpu, (const uint8_t *)&query, QUERY_BUFFER_OFFSET, sizeof(query)) != DPU_API_SUCCESS) {
+        fprintf(stderr, "error when loading the query field\n");
         return false;
     }
 

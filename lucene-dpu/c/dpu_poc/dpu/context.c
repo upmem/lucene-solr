@@ -18,11 +18,14 @@
 #include "terms_enum_frame.h"
 #include <search_context.h>
 
-query_t __attribute__((aligned(MRAM_ACCESS_ALIGNMENT))) the_query;
+static terms_enum_t terms_enums[NR_THREADS];
+static bytes_ref_t empty_outputs_bytes_ref[NR_THREADS];
 
-terms_enum_t terms_enums[NR_THREADS];
+static __attribute__((aligned(MRAM_ACCESS_ALIGNMENT))) query_t the_query;
+static __attribute__((aligned(MRAM_ACCESS_ALIGNMENT))) flat_search_context_t flat_contexts[NR_THREADS];
+static __attribute__((aligned(MRAM_ACCESS_ALIGNMENT))) flat_field_reader_t field_readers[NR_THREADS];
 
-flat_search_context_t flat_contexts[NR_THREADS];
+__attribute__((aligned(MRAM_ACCESS_ALIGNMENT))) uint64_t flat_context_offsets[NR_THREADS];
 
 static inline uint32_t dma_aligned(uint32_t x) {
     return (x + (MRAM_ACCESS_ALIGNMENT - 1)) & ~(MRAM_ACCESS_ALIGNMENT - 1);
@@ -62,40 +65,16 @@ terms_enum_t *initialize_terms_enum(uint32_t index, flat_field_reader_t *field_r
 flat_search_context_t* initialize_flat_context(uint32_t index) {
     flat_search_context_t* context = flat_contexts + index;
 
-    uint64_t offset;
-    MRAM_READ(&offset, SEGMENT_SUMMARY_OFFSET + index * SEGMENT_SUMMARY_ENTRY_SIZE, SEGMENT_SUMMARY_ENTRY_SIZE);
-    mram_readX((mram_addr_t) offset, context, sizeof(*context));
+    MRAM_READ(&flat_context_offsets[index], SEGMENT_SUMMARY_OFFSET + index * SEGMENT_SUMMARY_ENTRY_SIZE, SEGMENT_SUMMARY_ENTRY_SIZE);
+    mram_readX((mram_addr_t) flat_context_offsets[index], context, sizeof(*context));
 
-    uint32_t variable_length_content_size = dma_aligned(context->term_reader.nr_fields * sizeof(*(context->fields)))
-                                            + dma_aligned(context->nr_norms_entries * sizeof(*(context->entries)))
-                                            + dma_aligned(context->empty_outputs_length);
-    uint8_t *variable_length_content = malloc(variable_length_content_size);
-    mram_readX((mram_addr_t) (offset + dma_aligned(sizeof(*context))), variable_length_content, variable_length_content_size);
-
-    context->entries = (flat_norms_entry_t *) variable_length_content;
-    context->fields = (flat_field_reader_t *) dma_aligned((uint32_t) (context->entries + context->nr_norms_entries));
-
-    uint8_t *empty_outputs = (uint8_t *) dma_aligned((uint32_t) (context->fields + context->term_reader.nr_fields));
-
-    for (int i = 0; i < context->term_reader.nr_fields; ++i) {
-        flat_fst_t* fst = &context->fields[i].index;
-        if (fst->empty_output_offset >= 0) {
-            uint8_t num_bytes = (empty_outputs[fst->empty_output_offset] & 0xff) |
-                    ((empty_outputs[fst->empty_output_offset + 1] & 0xff) << 8)  |
-                    ((empty_outputs[fst->empty_output_offset + 2] & 0xff) << 16) |
-                    ((empty_outputs[fst->empty_output_offset + 3] & 0xff) << 24) ;
-
-            if (num_bytes != 0) {
-                fst->empty_output = malloc(sizeof(*(fst->empty_output)));
-                fst->empty_output->bytes = empty_outputs;
-                fst->empty_output->offset = fst->empty_output_offset + 4;
-                fst->empty_output->length = num_bytes;
-                fst->empty_output->capacity = num_bytes;
-            } else {
-                fst->empty_output = NULL;
-            }
-        }
-    }
+    uint32_t variable_length_content_size = dma_aligned(context->term_reader.nr_fields * sizeof(flat_field_reader_t))
+        + dma_aligned(context->nr_norms_entries * sizeof(flat_norms_entry_t));
+    uint32_t empty_outputs_size = dma_aligned(context->empty_outputs_length);
+    context->empty_outputs = malloc(empty_outputs_size);
+    mram_readX((mram_addr_t) (flat_context_offsets[index] + dma_aligned(sizeof(*context)) + variable_length_content_size),
+               context->empty_outputs,
+               empty_outputs_size);
 
     mram_cache_t* cache = mram_cache_for(index);
     cache->cached = 0xFFFFFFFF;
@@ -107,12 +86,33 @@ flat_search_context_t* initialize_flat_context(uint32_t index) {
     return context;
 }
 
-flat_field_reader_t *fetch_flat_field_reader(flat_search_context_t *context, const char* field) {
-    for (int i = 0; i < context->term_reader.nr_fields; ++i) {
-        if (strcmp(field, context->fields[i].field_info.name) == 0) {
-            return context->fields + i;
+flat_field_reader_t *fetch_flat_field_reader(flat_search_context_t *context, const uint32_t field_id) {
+    unsigned int task_id = me();
+    flat_field_reader_t *res = &field_readers[task_id];
+    mram_readX(flat_context_offsets[task_id] + dma_aligned(sizeof(*context))
+               + dma_aligned(context->nr_norms_entries * sizeof(flat_norms_entry_t))
+               + field_id * sizeof(flat_field_reader_t),
+               res,
+               sizeof(flat_field_reader_t));
+
+    uint8_t *empty_outputs = context->empty_outputs;
+    flat_fst_t* fst = &res->index;
+    if (fst->empty_output_offset >= 0) {
+        uint8_t num_bytes = (empty_outputs[fst->empty_output_offset] & 0xff) |
+            ((empty_outputs[fst->empty_output_offset + 1] & 0xff) << 8)  |
+            ((empty_outputs[fst->empty_output_offset + 2] & 0xff) << 16) |
+            ((empty_outputs[fst->empty_output_offset + 3] & 0xff) << 24) ;
+
+        if (num_bytes != 0) {
+            fst->empty_output = &empty_outputs_bytes_ref[task_id];
+            fst->empty_output->bytes = empty_outputs;
+            fst->empty_output->offset = fst->empty_output_offset + 4;
+            fst->empty_output->length = num_bytes;
+            fst->empty_output->capacity = num_bytes;
+        } else {
+            fst->empty_output = NULL;
         }
     }
 
-    return NULL;
+    return res;
 }

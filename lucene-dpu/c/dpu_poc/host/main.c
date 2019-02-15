@@ -39,9 +39,15 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    unsigned int nb_fields_per_thread[NR_THREADS];
+    char **fields_name_per_thread[NR_THREADS];
     unsigned each_thread;
     for (each_thread = 0; each_thread < NR_THREADS; each_thread++) {
-        if (!load_segment_files(mram_image, index_directory, segment_number)) {
+        if (!load_segment_files(mram_image,
+                                index_directory,
+                                segment_number,
+                                &nb_fields_per_thread[each_thread],
+                                &fields_name_per_thread[each_thread])) {
             free_mram_image(mram_image);
             free_dpu_system(dpu_system);
             return 1;
@@ -54,15 +60,17 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    free_mram_image(mram_image);
-
-    search(dpu_system, "contents", "apache", true);
+    search(dpu_system, "contents", "apache", true, nb_fields_per_thread, fields_name_per_thread);
 //    search(dpu_system, "contents", "patent", true);
 //    search(dpu_system, "contents", "lucene", true);
 //    search(dpu_system, "contents", "gnu", true);
 //    search(dpu_system, "contents", "derivative", true);
 //    search(dpu_system, "contents", "license", true);
 
+    for (each_thread = 0; each_thread < NR_THREADS; each_thread++) {
+        free (fields_name_per_thread[each_thread]);
+    }
+    free_mram_image(mram_image);
     free_dpu_system(dpu_system);
 
     return 0;

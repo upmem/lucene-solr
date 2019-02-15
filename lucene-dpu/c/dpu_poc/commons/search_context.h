@@ -38,8 +38,7 @@ typedef struct {
 
     uint32_t empty_outputs_length;
 
-    DPU_PTR(flat_field_reader_t *) fields;
-    DPU_PTR(flat_norms_entry_t *) entries;
+    DPU_PTR(uint8_t *)empty_outputs;
 } flat_search_context_t;
 
 #endif //DPU_POC_SEARCH_CONTEXT_H
