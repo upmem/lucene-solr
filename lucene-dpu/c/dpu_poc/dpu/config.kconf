@@ -1,4 +1,3 @@
-tasklet add 0..9 large main 0
 mutex 2
 save
 quit

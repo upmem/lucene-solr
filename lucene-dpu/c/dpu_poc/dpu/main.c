@@ -17,6 +17,9 @@
 
 DECLARE_BARRIER(init_barrier, NR_THREADS)
 
+#define TASKLETS_INITIALIZER TASKLETS(10, main, 1024, 0)
+#include <rt.h>
+
 int main(void) {
     query_t *query;
     flat_search_context_t *context;
