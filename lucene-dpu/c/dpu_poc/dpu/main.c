@@ -10,6 +10,10 @@
 #include "search.h"
 #include "job_load_balancing.h"
 
+#define TASKLETS_INITIALIZER \
+    TASKLETS(NR_THREADS, main, 1024, 0)
+#include <rt.h>
+
 int main(void) {
     query_t *query;
     flat_search_context_t *context;

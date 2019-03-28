@@ -14,8 +14,10 @@ uint32_t nr_jobs_available;
 
 scoring_job_t jobs[MAX_NR_JOBS];
 
-mutex_t job_mutex = mutex_get(0);
-mutex_t producer_mutex = mutex_get(1);
+DECLARE_MUTEX(job_mutex);
+DECLARE_MUTEX(producer_mutex);
+mutex_t job_mutex = MUTEX(job_mutex);
+mutex_t producer_mutex = MUTEX(job_mutex);
 
 bool add_scoring_job(int32_t doc,
                      uint32_t doc_count,
