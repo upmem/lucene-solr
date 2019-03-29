@@ -4,6 +4,7 @@
 
 #include <stddef.h>
 #include <mutex.h>
+#include <string.h>
 #include "dpu_characteristics.h"
 #include "job_load_balancing.h"
 
@@ -52,24 +53,28 @@ bool add_scoring_job(int32_t doc,
     return true;
 }
 
-scoring_job_t *fetch_scoring_job(void) {
+bool fetch_scoring_job(scoring_job_t *ret_job) {
     mutex_lock(job_mutex);
 
     uint32_t job_id;
 
     if ((job_id = nr_jobs_available) == 0) {
         mutex_unlock(job_mutex);
-        return NULL;
+        return false;
     }
 
     nr_jobs_available--;
+    memcpy(ret_job, jobs + (job_id - 1), sizeof(scoring_job_t));
 
     mutex_unlock(job_mutex);
-    return jobs + (job_id - 1);
+    return true;
 }
 
 void init_scoring_job_producers(void) {
+    mutex_lock(producer_mutex);
     nr_producers = NR_THREADS;
+    nr_jobs_available = 0;
+    mutex_unlock(producer_mutex);
 }
 
 void remove_scoring_job_producer(void) {
@@ -79,9 +84,5 @@ void remove_scoring_job_producer(void) {
 }
 
 bool has_job_producers(void) {
-    mutex_lock(producer_mutex);
-    bool non_empty = nr_producers != 0;
-    mutex_unlock(producer_mutex);
-
-    return non_empty;
+    return nr_producers != 0;
 }

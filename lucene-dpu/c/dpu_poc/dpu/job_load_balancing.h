@@ -28,7 +28,7 @@ bool add_scoring_job(int32_t doc,
                      uint32_t task_id,
                      uint32_t output_id);
 
-scoring_job_t *fetch_scoring_job(void);
+bool fetch_scoring_job(scoring_job_t *);
 void init_scoring_job_producers(void);
 void remove_scoring_job_producer(void);
 bool has_job_producers(void);

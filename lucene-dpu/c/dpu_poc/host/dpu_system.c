@@ -23,7 +23,7 @@ dpu_system_t* initialize_dpu_system(const char* dpu_binary, dpu_type_t dpu_type,
 
     dpu_logging_config_t log = {
             .source = KTRACE,
-            .destination_directory_name = "."
+            .destination_directory_name = "/tmp"
     };
 
     dpu_param_t params = {

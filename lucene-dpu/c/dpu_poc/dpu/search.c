@@ -5,6 +5,7 @@
 #include <defs.h>
 #include <stdlib.h>
 
+#include "perfcounter.h"
 #include "mram_structure.h"
 #include "search.h"
 #include "bytes_ref.h"
@@ -17,7 +18,7 @@
 
 static flat_norms_entry_t norms_entries[NR_THREADS];
 
-void search(flat_search_context_t *ctx, uint32_t field_id, char *value) {
+void search(flat_search_context_t *ctx, uint32_t field_id, char *value, perfcounter_t *perf) {
     unsigned int task_id = me();
     unsigned int nb_output = 0;
     flat_field_reader_t *field_reader = fetch_flat_field_reader(ctx, field_id);
@@ -61,19 +62,20 @@ void search(flat_search_context_t *ctx, uint32_t field_id, char *value) {
             nb_output++;
         }
 
+        *perf = perfcounter_get();
         remove_scoring_job_producer();
 
         while (true) {
-            scoring_job_t *new_job = fetch_scoring_job();
+            scoring_job_t new_job;
 
-            if (new_job != NULL) {
-                output.doc_id = new_job->doc;
-                output.score = compute_bm25(new_job->doc_count,
-                                               new_job->doc_freq,
-                                               new_job->freq,
-                                               new_job->doc_norm,
-                                               new_job->sum_total_term_freq);
-                MRAM_WRITE(OUTPUTS_BUFFER_OFFSET + new_job->task_id * OUTPUTS_BUFFER_SIZE_PER_THREAD + new_job->output_id * OUTPUT_SIZE,
+            if (fetch_scoring_job(&new_job)) {
+                output.doc_id = new_job.doc;
+                output.score = compute_bm25(new_job.doc_count,
+                                               new_job.doc_freq,
+                                               new_job.freq,
+                                               new_job.doc_norm,
+                                               new_job.sum_total_term_freq);
+                MRAM_WRITE(OUTPUTS_BUFFER_OFFSET + new_job.task_id * OUTPUTS_BUFFER_SIZE_PER_THREAD + new_job.output_id * OUTPUT_SIZE,
                            &output,
                            OUTPUT_SIZE);
             } else if (!has_job_producers()) {

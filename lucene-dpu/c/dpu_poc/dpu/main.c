@@ -21,7 +21,7 @@ int main(void) {
     query_t *query;
     flat_search_context_t *context;
     uint32_t task_id = me();
-    perfcounter_t start, end;
+    perfcounter_t start, end, middle;
     barrier_t barrier = BARRIER(init_barrier);
 
     if (task_id == 0) {
@@ -41,10 +41,14 @@ int main(void) {
     barrier_wait(barrier);
 
     start = perfcounter_get();
-    search(context, query->field_id, query->value);
+    search(context, query->field_id, query->value, &middle);
     end = perfcounter_get();
 
-    ktrace("[%i] perfcounter:%u\n", task_id, (unsigned)(end - start));
+    ktrace("[%i] perfcounter:%u (seek %u, bm25 %u)\n",
+           task_id,
+           (unsigned)(end - start),
+           (unsigned)(middle - start),
+           (unsigned)(end - middle));
 
     return 0;
 }

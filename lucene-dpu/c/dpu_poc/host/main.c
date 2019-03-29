@@ -14,8 +14,8 @@
 
 #define DPU_BINARY_PATH STR(DPU_BINARY)
 
-#define DPU_TYPE FUNCTIONAL_SIMULATOR
-#define DPU_PROFILE "iramSize=8192"
+#define DPU_TYPE HW
+#define DPU_PROFILE "cycleAccurate=true"
 
 int main(int argc, char **argv) {
     if (argc != 3) {
