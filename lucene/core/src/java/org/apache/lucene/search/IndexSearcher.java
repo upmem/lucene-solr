@@ -86,6 +86,8 @@ import org.apache.lucene.util.ThreadInterruptedException;
  */
 public class IndexSearcher {
 
+  private static long acc = 0;
+  private static int nb_occ = 0;
   private static QueryCache DEFAULT_QUERY_CACHE;
   private static QueryCachingPolicy DEFAULT_CACHING_POLICY = new UsageTrackingQueryCachingPolicy();
   static {
@@ -713,11 +715,17 @@ public class IndexSearcher {
    * @lucene.experimental
    */
   public Weight createWeight(Query query, ScoreMode scoreMode, float boost) throws IOException {
+    long start = System.nanoTime();
     final QueryCache queryCache = this.queryCache;
     Weight weight = query.createWeight(this, scoreMode, boost);
     if (scoreMode.needsScores() == false && queryCache != null) {
       weight = queryCache.doCache(weight, queryCachingPolicy);
     }
+    long end = System.nanoTime();
+    acc += (end - start);
+    nb_occ++;
+    if (nb_occ == 1000000)
+      System.out.println("createWeight time: " + (acc / (1e3 * nb_occ)) + " us");
     return weight;
   }
 
