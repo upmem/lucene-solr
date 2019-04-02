@@ -14,12 +14,17 @@
 
 #define MRAM_SIZE (1 << 26)
 
+#define IDF_OUTPUT_OFFSET (0)
+#define IDF_OUTPUT_SIZE 16
+_Static_assert(sizeof(dpu_idf_output_t) == IDF_OUTPUT_SIZE,
+               "check that IDF_OUTPUT_SIZE matches the effective size of dpu_idf_output_t");
+
 #define OUTPUTS_PER_THREAD (64*1024)
-#define OUTPUTS_BUFFER_OFFSET (0)
+#define OUTPUTS_BUFFER_OFFSET (DMA_ALIGNED(IDF_OUTPUT_OFFSET + IDF_OUTPUT_SIZE))
 #define OUTPUT_SIZE 16
 #define OUTPUTS_BUFFER_SIZE_PER_THREAD (OUTPUTS_PER_THREAD * OUTPUT_SIZE)
 #define OUTPUTS_BUFFER_SIZE (OUTPUTS_BUFFER_SIZE_PER_THREAD * NR_THREADS)
-_Static_assert(sizeof(dpu_output_t) == 16, "check that OUTPUT_SIZE matches the effective size of dpu_ouput_t");
+_Static_assert(sizeof(dpu_output_t) == OUTPUT_SIZE, "check that OUTPUT_SIZE matches the effective size of dpu_ouput_t");
 
 #define QUERY_BUFFER_OFFSET (DMA_ALIGNED(OUTPUTS_BUFFER_OFFSET + OUTPUTS_BUFFER_SIZE))
 #define QUERY_BUFFER_SIZE 24

@@ -9,6 +9,7 @@
 #include <dpulog.h>
 #include "dpu_system.h"
 #include "query.h"
+#include "x86_process/term_scorer.h"
 
 static bool load_query(dpu_system_t *dpu_system, const char *field, const char *value, unsigned int *, char ***);
 static bool process_results(dpu_system_t *dpu_system);
@@ -142,14 +143,23 @@ static bool load_query(dpu_system_t *dpu_system, const char *field, const char *
     return true;
 }
 
-#define NR_TOTAL_OUTPUT (NR_THREADS * OUTPUTS_PER_THREAD)
 static bool process_results(dpu_system_t *dpu_system) {
-    dpu_output_t *results = (dpu_output_t *)malloc(NR_TOTAL_OUTPUT * sizeof(dpu_output_t));
-    if (dpu_copy_from_individual(dpu_system->dpu, 0, (uint8_t *)results, sizeof(dpu_output_t) * NR_TOTAL_OUTPUT) != DPU_API_SUCCESS) {
+    dpu_output_t *results = (dpu_output_t *)malloc(OUTPUTS_BUFFER_SIZE);
+    if (dpu_copy_from_individual(dpu_system->dpu,
+                                 OUTPUTS_BUFFER_OFFSET,
+                                 (uint8_t *)results,
+                                 OUTPUTS_BUFFER_SIZE) != DPU_API_SUCCESS) {
         fprintf(stderr, "error when reading the results\n");
         free(results);
         return false;
     }
+    dpu_idf_output_t idf_output;
+    if (dpu_copy_from_individual(dpu_system->dpu, IDF_OUTPUT_OFFSET, (uint8_t *)&idf_output, IDF_OUTPUT_SIZE) != DPU_API_SUCCESS) {
+        fprintf(stderr, "error when reading the idf_output\n");
+        free(results);
+        return false;
+    }
+
     unsigned int each_thread;
     printf("######## RESULTS #########\n");
     for (each_thread = 0; each_thread < NR_THREADS; each_thread++) {
@@ -158,7 +168,11 @@ static bool process_results(dpu_system_t *dpu_system) {
             printf("[%u] doc:%u \tscore:%f\n",
                    each_thread,
                    curr_result->doc_id,
-                   ((float)curr_result->score) / ((float)SCORE_PRECISION));
+                   compute_score(idf_output.doc_count,
+                                 idf_output.doc_freq,
+                                 curr_result->freq,
+                                 curr_result->doc_norm,
+                                 idf_output.total_term_freq));
             curr_result++;
         }
     }

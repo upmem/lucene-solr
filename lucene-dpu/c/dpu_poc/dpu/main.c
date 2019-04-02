@@ -9,7 +9,7 @@
 
 #include "context.h"
 #include "search.h"
-#include "job_load_balancing.h"
+#include "idf_output.h"
 
 #define TASKLETS_INITIALIZER \
     TASKLETS(NR_THREADS, main, 1024, 0)
@@ -21,11 +21,11 @@ int main(void) {
     query_t *query;
     flat_search_context_t *context;
     uint32_t task_id = me();
-    perfcounter_t start, end, middle;
+    perfcounter_t start, end;
     barrier_t barrier = BARRIER(init_barrier);
 
     if (task_id == 0) {
-        init_scoring_job_producers();
+        init_idf_output();
         perfcounter_config(COUNT_CYCLES, true);
         query = fetch_query(true);
     }
@@ -41,14 +41,12 @@ int main(void) {
     barrier_wait(barrier);
 
     start = perfcounter_get();
-    search(context, query->field_id, query->value, &middle);
+    search(context, query->field_id, query->value);
     end = perfcounter_get();
 
-    ktrace("[%i] perfcounter:%u (seek %u, bm25 %u)\n",
+    ktrace("[%i] perfcounter:%u\n",
            task_id,
-           (unsigned)(end - start),
-           (unsigned)(middle - start),
-           (unsigned)(end - middle));
+           (unsigned)(end - start));
 
     return 0;
 }
