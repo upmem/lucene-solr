@@ -14,29 +14,29 @@
 
 #define DPU_BINARY_PATH STR(DPU_BINARY)
 
-#define DPU_TYPE HW
+#define DPU_TYPE FUNCTIONAL_SIMULATOR
 #define DPU_PROFILE "cycleAccurate=true"
 
 int main(int argc, char **argv) {
-    if (argc != 3) {
+    if (argc != 2) {
         fprintf(stderr, "usage: %s <index directory> <segment number>\n", basename(argv[0]));
         return 1;
     }
 
     char *index_directory = argv[1];
-    uint32_t segment_number = (uint32_t) atoi(argv[2]);
+    /* uint32_t segment_number = (uint32_t) atoi(argv[2]); */
 
     dpu_system_t *dpu_system = initialize_dpu_system(DPU_BINARY_PATH, DPU_TYPE, DPU_PROFILE);
 
     if (dpu_system == NULL) {
-        return 1;
+        return 2;
     }
 
     mram_image_t *mram_image = mram_image_new();
 
     if (mram_image == NULL) {
         free_dpu_system(dpu_system);
-        return 1;
+        return 3;
     }
 
     unsigned int nb_fields_per_thread[NR_THREADS];
@@ -45,22 +45,22 @@ int main(int argc, char **argv) {
     for (each_thread = 0; each_thread < NR_THREADS; each_thread++) {
         if (!load_segment_files(mram_image,
                                 index_directory,
-                                segment_number,
+                                each_thread,
                                 &nb_fields_per_thread[each_thread],
                                 &fields_name_per_thread[each_thread])) {
             free_mram_image(mram_image);
             free_dpu_system(dpu_system);
-            return 1;
+            return 4;
         }
     }
 
     if (!prepare_mrams_with_segments(dpu_system, mram_image)) {
         free_mram_image(mram_image);
         free_dpu_system(dpu_system);
-        return 1;
+        return 5;
     }
 
-    search(dpu_system, "contents", "apache", true, nb_fields_per_thread, fields_name_per_thread);
+    search(dpu_system, "contents", "stupid", true, nb_fields_per_thread, fields_name_per_thread);
 //    search(dpu_system, "contents", "patent", true);
 //    search(dpu_system, "contents", "lucene", true);
 //    search(dpu_system, "contents", "gnu", true);
