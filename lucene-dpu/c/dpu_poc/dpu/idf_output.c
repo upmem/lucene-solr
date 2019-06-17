@@ -4,14 +4,14 @@
 #include "mram_structure.h"
 #include "mram_access.h"
 
-DECLARE_MUTEX(idf_mutex);
+MUTEX_INIT(idf_mutex);
 static unsigned nb_thread_accumulated;
 static dpu_idf_output_t idf_output;
-static mutex_t idf_mutex;
+static mutex_id_t idf_mutex;
 
 void init_idf_output()
 {
-    idf_mutex = MUTEX(idf_mutex);
+    idf_mutex = MUTEX_GET(idf_mutex);
     nb_thread_accumulated = 0;
     idf_output.doc_count = 0;
     idf_output.doc_freq = 0;

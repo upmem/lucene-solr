@@ -15,17 +15,14 @@
     TASKLETS(NR_THREADS, main, 1024, 0)
 #include <rt.h>
 
-DECLARE_BARRIER(init_barrier, NR_THREADS)
-
-#define TASKLETS_INITIALIZER TASKLETS(10, main, 1024, 0)
-#include <rt.h>
+BARRIER_INIT(init_barrier, NR_THREADS)
 
 int main(void) {
     query_t *query;
     flat_search_context_t *context;
     uint32_t task_id = me();
     perfcounter_t start, end;
-    barrier_t barrier = BARRIER(init_barrier);
+    barrier_id_t barrier = BARRIER_GET(init_barrier);
 
     if (task_id == 0) {
         init_idf_output();
