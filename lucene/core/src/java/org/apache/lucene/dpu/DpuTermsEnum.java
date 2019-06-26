@@ -22,6 +22,7 @@ package org.apache.lucene.dpu;
 
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.List;
 
 import org.apache.lucene.index.ImpactsEnum;
 import org.apache.lucene.index.PostingsEnum;
@@ -29,25 +30,27 @@ import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.util.BytesRef;
 
 public final class DpuTermsEnum extends TermsEnum {
-  private DpuManager dpuManager;
-  private int fieldId;
+  private final DpuTerms terms;
 
-  private Iterator<DpuManager.DpuResult> results;
+  private List<DpuManager.DpuResult> results;
+  private int resultIndex;
+  private int maxResults;
+
+  DpuTermsEnum(DpuTerms terms) {
+    this.terms = terms;
+  }
 
   @Override
   public boolean seekExact(BytesRef target) throws IOException {
-    this.results = this.dpuManager.search(this.fieldId, target).iterator();
+    this.results = this.terms.indexReader.dpuManager.search(this.terms.fieldNumber, target);
+    this.resultIndex = 0;
+    this.maxResults = this.results.size();
 
-    return next() != null;
+    return goToNextResult() != -1;
   }
 
   @Override
   public SeekStatus seekCeil(BytesRef text) throws IOException {
-    throw new RuntimeException("UPMEM not implemented");
-  }
-
-  @Override
-  public void seekExact(long ord) throws IOException {
     throw new RuntimeException("UPMEM not implemented");
   }
 
@@ -57,18 +60,13 @@ public final class DpuTermsEnum extends TermsEnum {
   }
 
   @Override
-  public long ord() throws IOException {
-    throw new RuntimeException("UPMEM not implemented");
-  }
-
-  @Override
   public int docFreq() throws IOException {
-    throw new RuntimeException("UPMEM not implemented");
+    return this.results.get(this.resultIndex).getDocFreq();
   }
 
   @Override
   public long totalTermFreq() throws IOException {
-    throw new RuntimeException("UPMEM not implemented");
+    return this.results.get(this.resultIndex).getTotalTermFreq();
   }
 
   @Override
@@ -83,8 +81,43 @@ public final class DpuTermsEnum extends TermsEnum {
 
   @Override
   public BytesRef next() throws IOException {
+    throw new RuntimeException("UPMEM not implemented");
+  }
+
+  private int goToNextResult() {
     assert (this.results != null) : "UPMEM calling next() before doing a search";
 
-    throw new RuntimeException("UPMEM not implemented");
+    if (this.resultIndex == this.maxResults) {
+      return -1;
+    }
+
+    int docId;
+
+    while (true) {
+      DpuManager.DpuResult result = this.results.get(this.resultIndex);
+      docId = result.next();
+
+      if (docId != -1) {
+        break;
+      }
+
+      if (this.resultIndex == (this.maxResults - 1)) {
+        break;
+      }
+
+      this.resultIndex++;
+    }
+
+    return docId;
+  }
+
+  @Override
+  public void seekExact(long ord) throws IOException {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public long ord() throws IOException {
+    throw new UnsupportedOperationException();
   }
 }

@@ -26,49 +26,85 @@ import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
 
 public final class DpuTerms extends Terms {
+  final DpuIndexReader indexReader;
+
+  final int fieldNumber;
+  private long sumTotalTermFreq;
+  private long sumDocFreq;
+  private int docCount;
+
+  private boolean hasFreqs;
+  private boolean hasOffsets;
+  private boolean hasPositions;
+  private boolean hasPayloads;
+
+  public DpuTerms(DpuIndexReader dpuIndexReader, int fieldNumber) {
+    this.indexReader = dpuIndexReader;
+    this.fieldNumber = fieldNumber;
+    this.sumTotalTermFreq = 0;
+    this.sumDocFreq = 0;
+    this.docCount = 0;
+    this.hasFreqs = true;
+    this.hasOffsets = true;
+    this.hasPositions = true;
+    this.hasPayloads = false;
+  }
+
+  public void add(int fieldNumber, long sumTotalTermFreq, long sumDocFreq, int docCount,
+                  boolean hasFreqs, boolean hasOffsets, boolean hasPositions, boolean hasPayloads) {
+    assert this.fieldNumber == fieldNumber : "UPMEM field should have the same number in all segments";
+
+    this.sumTotalTermFreq += sumTotalTermFreq;
+    this.sumDocFreq += sumDocFreq;
+    this.docCount += docCount;
+    this.hasFreqs &= hasFreqs;
+    this.hasOffsets &= hasOffsets;
+    this.hasPositions &= hasPositions;
+    this.hasPayloads |= hasPayloads;
+  }
 
   @Override
   public TermsEnum iterator() throws IOException {
-    throw new RuntimeException("UPMEM not implemented");
+    return new DpuTermsEnum(this);
   }
 
   @Override
   public long size() throws IOException {
-    throw new RuntimeException("UPMEM not implemented");
+    return -1;
   }
 
   @Override
   public long getSumTotalTermFreq() throws IOException {
-    throw new RuntimeException("UPMEM not implemented");
+    return this.sumTotalTermFreq;
   }
 
   @Override
   public long getSumDocFreq() throws IOException {
-    throw new RuntimeException("UPMEM not implemented");
+    return this.sumDocFreq;
   }
 
   @Override
   public int getDocCount() throws IOException {
-    throw new RuntimeException("UPMEM not implemented");
+    return this.docCount;
   }
 
   @Override
   public boolean hasFreqs() {
-    throw new RuntimeException("UPMEM not implemented");
+    return this.hasFreqs;
   }
 
   @Override
   public boolean hasOffsets() {
-    throw new RuntimeException("UPMEM not implemented");
+    return this.hasOffsets;
   }
 
   @Override
   public boolean hasPositions() {
-    throw new RuntimeException("UPMEM not implemented");
+    return this.hasPositions;
   }
 
   @Override
   public boolean hasPayloads() {
-    throw new RuntimeException("UPMEM not implemented");
+    return this.hasPayloads;
   }
 }
