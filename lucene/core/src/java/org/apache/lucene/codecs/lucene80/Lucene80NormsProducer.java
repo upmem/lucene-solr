@@ -40,11 +40,13 @@ import static org.apache.lucene.codecs.lucene80.Lucene80NormsFormat.VERSION_STAR
 /**
  * Reader for {@link Lucene80NormsFormat}
  */
-final class Lucene80NormsProducer extends NormsProducer implements Cloneable {
+// UPMEM change: package -> public
+public final class Lucene80NormsProducer extends NormsProducer implements Cloneable {
   // metadata maps (just file pointers and minimal stuff)
   private final Map<Integer,NormsEntry> norms = new HashMap<>();
   private final int maxDoc;
-  private IndexInput data;
+  // UPMEM change: private -> public
+  public IndexInput data;
   private boolean merging;
   private Map<Integer, IndexInput> disiInputs;
   private Map<Integer, RandomAccessInput> disiJumpTables;

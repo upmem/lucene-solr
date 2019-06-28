@@ -22,14 +22,19 @@ package org.apache.lucene.dpu;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.IntBuffer;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.upmem.dpu.host.api.DpuException;
@@ -38,15 +43,21 @@ import com.upmem.dpu.host.api.DpuRank;
 import com.upmem.dpujni.DpuDescription;
 import com.upmem.dpujni.DpuMramTransfer;
 import com.upmem.properties.DpuType;
+import org.apache.lucene.codecs.lucene50.ForUtil;
+import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.FieldInfos;
+import org.apache.lucene.index.IndexOptions;
+import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.packed.BulkOperationPacked;
+import org.apache.lucene.util.packed.PackedInts;
 
 public final class DpuManager {
   private static final DpuType DEFAULT_DPU_TYPE = DpuType.simulator;
   private static final String DEFAULT_DPU_PROFILE = "";
   private static final String DPU_SEARCH_PROGRAM = "org/apache/lucene/dpu/term_search.dpu";
   private static final int SYSTEM_THREAD = 0;
-  private static final int NR_THREADS = 10;
+  private static final int NR_THREADS = 1;
   private static final int MEMORY_IMAGE_OFFSET = 0;
   private static final int IDF_OUTPUT_OFFSET = 0;
   private static final int IDF_OUTPUT_SIZE = 16;
@@ -57,24 +68,78 @@ public final class DpuManager {
   private static final int OUTPUTS_BUFFER_SIZE = OUTPUTS_BUFFER_SIZE_PER_THREAD * NR_THREADS;
   private static final int QUERY_BUFFER_OFFSET = DMA_ALIGNED(OUTPUTS_BUFFER_OFFSET + OUTPUTS_BUFFER_SIZE);
   private static final int MAX_VALUE_SIZE = 20;
-  private static final int MAX_FIELD_SIZE = 4;
-  private static final int QUERY_BUFFER_SIZE = MAX_VALUE_SIZE + MAX_FIELD_SIZE;
+  private static final int MAX_FIELD_SIZE = 16;
+  private static final int QUERY_BUFFER_SIZE = MAX_VALUE_SIZE + 4;
   private static final int SEGMENT_SUMMARY_OFFSET = DMA_ALIGNED(QUERY_BUFFER_OFFSET + QUERY_BUFFER_SIZE);
   private static final int SEGMENT_SUMMARY_ENTRY_SIZE = 8;
   private static final int SEGMENTS_OFFSET = DMA_ALIGNED(SEGMENT_SUMMARY_OFFSET + NR_THREADS * SEGMENT_SUMMARY_ENTRY_SIZE);
 
-  private static final int DPU_CONTEXT_NR_FIELDS_OFFSET = 0;
-  private static final int DPU_CONTEXT_HAS_FREQ_OFFSET = 16;
-  private static final int DPU_CONTEXT_HAS_PROX_OFFSET = 17;
-  private static final int DPU_CONTEXT_HAS_PAYLOADS_OFFSET = 18;
-  private static final int DPU_CONTEXT_HAS_OFFSETS_OFFSET = 19;
-  private static final int DPU_CONTEXT_HAS_VECTORS_OFFSET = 20;
-  private static final int DPU_CONTEXT_HAS_NORMS_OFFSET = 21;
-  private static final int DPU_CONTEXT_HAS_DOCVALUES_OFFSET = 22;
-  private static final int DPU_CONTEXT_HAS_POINTVALUES_OFFSET = 23;
-  private static final int DPU_CONTEXT_SOFT_DELETES_FIELD_OFFSET = 24;
+  private static final int DPU_PACKED_INT_DECODER_BITS_PER_VALUE_OFFSET = 0;
+  private static final int DPU_PACKED_INT_DECODER_LONG_BLOCK_COUNT_OFFSET = DPU_PACKED_INT_DECODER_BITS_PER_VALUE_OFFSET + 4;
+  private static final int DPU_PACKED_INT_DECODER_LONG_VALUE_COUNT_OFFSET = DPU_PACKED_INT_DECODER_LONG_BLOCK_COUNT_OFFSET + 4;
+  private static final int DPU_PACKED_INT_DECODER_BYTE_BLOCK_COUNT_OFFSET = DPU_PACKED_INT_DECODER_LONG_VALUE_COUNT_OFFSET + 4;
+  private static final int DPU_PACKED_INT_DECODER_BYTE_VALUE_COUNT_OFFSET = DPU_PACKED_INT_DECODER_BYTE_BLOCK_COUNT_OFFSET + 4;
+  private static final int DPU_PACKED_INT_DECODER_MASK_OFFSET = DPU_PACKED_INT_DECODER_BYTE_VALUE_COUNT_OFFSET + 4 + /* padding */ 4;
+  private static final int DPU_PACKED_INT_DECODER_INT_MASK_OFFSET = DPU_PACKED_INT_DECODER_MASK_OFFSET + 8;
+  private static final int DPU_PACKED_INT_DECODER_LENGTH = DPU_PACKED_INT_DECODER_INT_MASK_OFFSET + 4 + /* padding */ 4;
 
-  private static final int DPU_CONTEXT_LENGTH = 1462;
+  private static final int DPU_FOR_UTIL_SETUP_DONE_OFFSET = 0;
+  private static final int DPU_FOR_UTIL_ENCODED_SIZES_OFFSET = DPU_FOR_UTIL_SETUP_DONE_OFFSET + 33 + /* padding */ 3;
+  private static final int DPU_FOR_UTIL_DECODERS_OFFSET = DPU_FOR_UTIL_ENCODED_SIZES_OFFSET + 33 * 4;
+  private static final int DPU_FOR_UTIL_ITERATIONS_OFFSET = DPU_FOR_UTIL_DECODERS_OFFSET + 33 * DPU_PACKED_INT_DECODER_LENGTH;
+  private static final int DPU_FOR_UTIL_LENGTH = DPU_FOR_UTIL_ITERATIONS_OFFSET + 33 * 4 + /* padding */ 4;
+
+  private static final int DPU_CONTEXT_NR_FIELDS_OFFSET = 0;
+  private static final int DPU_CONTEXT_TERMS_IN_OFFSET = DPU_CONTEXT_NR_FIELDS_OFFSET + 4;
+  private static final int DPU_CONTEXT_HAS_FREQ_OFFSET = DPU_CONTEXT_TERMS_IN_OFFSET + 12;
+  private static final int DPU_CONTEXT_HAS_PROX_OFFSET = DPU_CONTEXT_HAS_FREQ_OFFSET + 1;
+  private static final int DPU_CONTEXT_HAS_PAYLOADS_OFFSET = DPU_CONTEXT_HAS_PROX_OFFSET + 1;
+  private static final int DPU_CONTEXT_HAS_OFFSETS_OFFSET = DPU_CONTEXT_HAS_PAYLOADS_OFFSET + 1;
+  private static final int DPU_CONTEXT_HAS_VECTORS_OFFSET = DPU_CONTEXT_HAS_OFFSETS_OFFSET + 1;
+  private static final int DPU_CONTEXT_HAS_NORMS_OFFSET = DPU_CONTEXT_HAS_VECTORS_OFFSET + 1;
+  private static final int DPU_CONTEXT_HAS_DOCVALUES_OFFSET = DPU_CONTEXT_HAS_NORMS_OFFSET + 1;
+  private static final int DPU_CONTEXT_HAS_POINTVALUES_OFFSET = DPU_CONTEXT_HAS_DOCVALUES_OFFSET + 1;
+  private static final int DPU_CONTEXT_SOFT_DELETES_FIELD_OFFSET = DPU_CONTEXT_HAS_POINTVALUES_OFFSET + 1;
+  private static final int DPU_CONTEXT_DOC_READER_OFFSET = DPU_CONTEXT_SOFT_DELETES_FIELD_OFFSET + MAX_FIELD_SIZE;
+  private static final int DPU_CONTEXT_FOR_UTIL_OFFSET = DPU_CONTEXT_DOC_READER_OFFSET + 12 + /* padding */ 4;
+  private static final int DPU_CONTEXT_NORMS_DATA_OFFSET = DPU_CONTEXT_FOR_UTIL_OFFSET + DPU_FOR_UTIL_LENGTH;
+  private static final int DPU_CONTEXT_NR_NORMS_ENTRIES_OFFSET = DPU_CONTEXT_NORMS_DATA_OFFSET + 12;
+  private static final int DPU_CONTEXT_EMPTY_OUTPUTS_LENGTH_OFFSET = DPU_CONTEXT_NR_NORMS_ENTRIES_OFFSET + 4;
+  private static final int DPU_CONTEXT_EMPTY_OUTPUTS_OFFSET = DPU_CONTEXT_EMPTY_OUTPUTS_LENGTH_OFFSET + 4;
+
+  private static final int DPU_FIELD_READER_NAME_OFFSET = 0;
+  private static final int DPU_FIELD_READER_NUMBER_OFFSET = DPU_FIELD_READER_NAME_OFFSET + MAX_FIELD_SIZE;
+  private static final int DPU_FIELD_READER_DOC_VALUES_TYPE_OFFSET = DPU_FIELD_READER_NUMBER_OFFSET + 4;
+  private static final int DPU_FIELD_READER_STORE_TERM_VECTOR_OFFSET = DPU_FIELD_READER_DOC_VALUES_TYPE_OFFSET + 4;
+  private static final int DPU_FIELD_READER_OMITS_NORMS_OFFSET = DPU_FIELD_READER_STORE_TERM_VECTOR_OFFSET + 1;
+  private static final int DPU_FIELD_READER_INDEX_OPTIONS_OFFSET = DPU_FIELD_READER_OMITS_NORMS_OFFSET + 1 + /* padding */ 2;
+  private static final int DPU_FIELD_READER_STORE_PAYLOADS_OFFSET = DPU_FIELD_READER_INDEX_OPTIONS_OFFSET + 4;
+  private static final int DPU_FIELD_READER_DV_GEN_OFFSET = DPU_FIELD_READER_STORE_PAYLOADS_OFFSET + 1 + /* padding */ 7;
+  private static final int DPU_FIELD_READER_POINT_DATA_DIMENSION_COUNT_OFFSET = DPU_FIELD_READER_DV_GEN_OFFSET + 8;
+  private static final int DPU_FIELD_READER_POINT_INDEX_DIMENSION_COUNT_OFFSET = DPU_FIELD_READER_POINT_DATA_DIMENSION_COUNT_OFFSET + 4;
+  private static final int DPU_FIELD_READER_POINT_NUM_BYTES_OFFSET = DPU_FIELD_READER_POINT_INDEX_DIMENSION_COUNT_OFFSET + 4;
+  private static final int DPU_FIELD_READER_SOFT_DELETES_FIELD_OFFSET = DPU_FIELD_READER_POINT_NUM_BYTES_OFFSET + 4;
+  private static final int DPU_FIELD_READER_EMPTY_OUTPUT_OFFSET_OFFSET = DPU_FIELD_READER_SOFT_DELETES_FIELD_OFFSET + 1 + /* padding */ 3;
+  private static final int DPU_FIELD_READER_EMPTY_OUTPUT_OFFSET = DPU_FIELD_READER_EMPTY_OUTPUT_OFFSET_OFFSET + 4;
+  private static final int DPU_FIELD_READER_START_NODE_OFFSET = DPU_FIELD_READER_EMPTY_OUTPUT_OFFSET + 4;
+  private static final int DPU_FIELD_READER_INPUT_TYPE_OFFSET = DPU_FIELD_READER_START_NODE_OFFSET + 4;
+  private static final int DPU_FIELD_READER_MRAM_START_OFFSET_OFFSET = DPU_FIELD_READER_INPUT_TYPE_OFFSET + 4;
+  private static final int DPU_FIELD_READER_MRAM_LENGTH_OFFSET = DPU_FIELD_READER_MRAM_START_OFFSET_OFFSET + 4;
+  private static final int DPU_FIELD_READER_LONGS_SIZE_OFFSET = DPU_FIELD_READER_MRAM_LENGTH_OFFSET + 4;
+  private static final int DPU_FIELD_READER_DOC_COUNT_OFFSET = DPU_FIELD_READER_LONGS_SIZE_OFFSET + 4;
+  private static final int DPU_FIELD_READER_SUM_TOTAL_TERM_FREQ_OFFSET = DPU_FIELD_READER_DOC_COUNT_OFFSET + 4;
+
+  private static final int DPU_NORMS_ENTRY_DOCS_WITH_FIELD_OFFSET_OFFSET = 0;
+  private static final int DPU_NORMS_ENTRY_DOCS_WITH_FIELD_LENGTH_OFFSET = DPU_NORMS_ENTRY_DOCS_WITH_FIELD_OFFSET_OFFSET + 8;
+  private static final int DPU_NORMS_ENTRY_JUMP_TABLE_ENTRY_COUNT_OFFSET = DPU_NORMS_ENTRY_DOCS_WITH_FIELD_LENGTH_OFFSET + 8;
+  private static final int DPU_NORMS_ENTRY_DENSE_RANK_POWER_OFFSET = DPU_NORMS_ENTRY_JUMP_TABLE_ENTRY_COUNT_OFFSET + 2;
+  private static final int DPU_NORMS_ENTRY_NUM_DOCS_WITH_FIELD_OFFSET = DPU_NORMS_ENTRY_DENSE_RANK_POWER_OFFSET + 1 + /* padding */ 1;
+  private static final int DPU_NORMS_ENTRY_BYTES_PER_NORM_OFFSET = DPU_NORMS_ENTRY_NUM_DOCS_WITH_FIELD_OFFSET + 4;
+  private static final int DPU_NORMS_ENTRY_NORMS_OFFSET_OFFSET = DPU_NORMS_ENTRY_BYTES_PER_NORM_OFFSET + 1 + /* padding*/ 7;
+
+  private static final int DPU_CONTEXT_LENGTH = DPU_CONTEXT_EMPTY_OUTPUTS_OFFSET + 4;
+  private static final int DPU_NORMS_ENTRY_LENGTH = DPU_NORMS_ENTRY_NORMS_OFFSET_OFFSET + 8;
+  private static final int DPU_FIELD_READER_LENGTH = DPU_FIELD_READER_SUM_TOTAL_TERM_FREQ_OFFSET + 8;
 
   private static final int DPU_OUTPUT_DOC_ID_OFFSET = 0;
   private static final int DPU_OUTPUT_FREQ_OFFSET = 8;
@@ -84,6 +149,13 @@ public final class DpuManager {
   private static final int DPU_IDF_OUTPUT_DOC_COUNT_OFFSET = 0;
   private static final int DPU_IDF_OUTPUT_DOC_FREQ_OFFSET = 4;
   private static final int DPU_IDF_OUTPUT_TOTAL_TERM_FREQ_OFFSET = 8;
+
+  private static final int DPU_MRAM_READER_INDEX_OFFSET = 0;
+  private static final int DPU_MRAM_READER_BASE_OFFSET = 4;
+  private static final int DPU_MRAM_READER_CACHE_OFFSET = 8;
+
+
+  private static final int DPU_NULL = 0;
 
   private static String dpuSearchProgramInstance = null;
 
@@ -119,10 +191,12 @@ public final class DpuManager {
     }
 
     this.memoryImage = new byte[this.description.mramSizeInBytes];
+    this.currentImageOffset = SEGMENTS_OFFSET;
     this.indexLoaded = false;
   }
 
-  public void loadSegment(int segmentNumber, FieldInfos fieldInfos) throws IOException {
+  public void loadSegment(int segmentNumber, FieldInfos fieldInfos, Map<Integer, DpuFieldReader> fieldReaders,
+                          ForUtil forUtil, IndexInput termsIn, IndexInput docIn, IndexInput normsData) throws IOException {
     assert this.currentRankId < this.ranks.length : "UPMEM too many segments for the number of allocated DPUs";
 
     int offsetAddress = SEGMENT_SUMMARY_OFFSET + this.currentThreadId * SEGMENT_SUMMARY_ENTRY_SIZE;
@@ -130,7 +204,7 @@ public final class DpuManager {
     write(offset, this.memoryImage, offsetAddress);
 
     int searchContextOffset = this.currentImageOffset;
-    write(fieldInfos.size(), this.memoryImage, searchContextOffset + DPU_CONTEXT_NR_FIELDS_OFFSET);
+    write(fieldReaders.size(), this.memoryImage, searchContextOffset + DPU_CONTEXT_NR_FIELDS_OFFSET);
     write(fieldInfos.hasFreq(), this.memoryImage, searchContextOffset + DPU_CONTEXT_HAS_FREQ_OFFSET);
     write(fieldInfos.hasProx(), this.memoryImage, searchContextOffset + DPU_CONTEXT_HAS_PROX_OFFSET);
     write(fieldInfos.hasPayloads(), this.memoryImage, searchContextOffset + DPU_CONTEXT_HAS_PAYLOADS_OFFSET);
@@ -144,14 +218,190 @@ public final class DpuManager {
       softDeletesField = "";
     }
     write(softDeletesField, this.memoryImage, searchContextOffset + DPU_CONTEXT_SOFT_DELETES_FIELD_OFFSET);
-    // todo(UPMEM) write(nr_norms_entries, this.memoryImage, searchContextOffset + DPU_CONTEXT_NR_NORMS_ENTRIES_OFFSET);
-    // todo(UPMEM) write(for_util, this.memoryImage, searchContextOffset + DPU_CONTEXT_FOR_UTIL_OFFSET);
+    int maxFieldId = -1;
+    for (FieldInfo fieldInfo : fieldInfos) {
+      if (fieldInfo.number > maxFieldId) {
+        maxFieldId = fieldInfo.number;
+      }
+    }
+    write(maxFieldId + 1, this.memoryImage, searchContextOffset + DPU_CONTEXT_NR_NORMS_ENTRIES_OFFSET);
+    PackedInts.Decoder[] decoders = forUtil.decoders;
+    for (int index = 1; index < decoders.length; index++) {
+      PackedInts.Decoder decoder = decoders[index];
+      boolean setupDone = false;
+      if (decoder instanceof BulkOperationPacked) {
+        BulkOperationPacked packed = (BulkOperationPacked) decoder;
+        write(packed.bitsPerValue, this.memoryImage, searchContextOffset + DPU_CONTEXT_FOR_UTIL_OFFSET + DPU_FOR_UTIL_DECODERS_OFFSET
+            + index * DPU_PACKED_INT_DECODER_LENGTH + DPU_PACKED_INT_DECODER_BITS_PER_VALUE_OFFSET);
+        write(packed.longBlockCount(), this.memoryImage, searchContextOffset + DPU_CONTEXT_FOR_UTIL_OFFSET + DPU_FOR_UTIL_DECODERS_OFFSET
+            + index * DPU_PACKED_INT_DECODER_LENGTH + DPU_PACKED_INT_DECODER_LONG_BLOCK_COUNT_OFFSET);
+        write(packed.longValueCount(), this.memoryImage, searchContextOffset + DPU_CONTEXT_FOR_UTIL_OFFSET + DPU_FOR_UTIL_DECODERS_OFFSET
+            + index * DPU_PACKED_INT_DECODER_LENGTH + DPU_PACKED_INT_DECODER_LONG_VALUE_COUNT_OFFSET);
+        write(packed.byteBlockCount(), this.memoryImage, searchContextOffset + DPU_CONTEXT_FOR_UTIL_OFFSET + DPU_FOR_UTIL_DECODERS_OFFSET
+            + index * DPU_PACKED_INT_DECODER_LENGTH + DPU_PACKED_INT_DECODER_BYTE_BLOCK_COUNT_OFFSET);
+        write(packed.byteValueCount(), this.memoryImage, searchContextOffset + DPU_CONTEXT_FOR_UTIL_OFFSET + DPU_FOR_UTIL_DECODERS_OFFSET
+            + index * DPU_PACKED_INT_DECODER_LENGTH + DPU_PACKED_INT_DECODER_BYTE_VALUE_COUNT_OFFSET);
+        write(packed.mask, this.memoryImage, searchContextOffset + DPU_CONTEXT_FOR_UTIL_OFFSET + DPU_FOR_UTIL_DECODERS_OFFSET
+            + index * DPU_PACKED_INT_DECODER_LENGTH + DPU_PACKED_INT_DECODER_MASK_OFFSET);
+        write(packed.intMask, this.memoryImage, searchContextOffset + DPU_CONTEXT_FOR_UTIL_OFFSET + DPU_FOR_UTIL_DECODERS_OFFSET
+            + index * DPU_PACKED_INT_DECODER_LENGTH + DPU_PACKED_INT_DECODER_INT_MASK_OFFSET);
+        setupDone = true;
+      }
+      write(setupDone, this.memoryImage, searchContextOffset + DPU_CONTEXT_FOR_UTIL_OFFSET + DPU_FOR_UTIL_SETUP_DONE_OFFSET + index);
+    }
+    write(forUtil.encodedSizes, this.memoryImage, searchContextOffset + DPU_CONTEXT_FOR_UTIL_OFFSET + DPU_FOR_UTIL_ENCODED_SIZES_OFFSET);
+    write(forUtil.iterations, this.memoryImage, searchContextOffset + DPU_CONTEXT_FOR_UTIL_OFFSET + DPU_FOR_UTIL_ITERATIONS_OFFSET);
     this.currentImageOffset = DMA_ALIGNED(this.currentImageOffset + DPU_CONTEXT_LENGTH);
-    // todo(UPMEM) write norms
+    for (int eachFieldId = 0; eachFieldId < maxFieldId + 1; eachFieldId++) {
+      // todo(UPMEM) write norms
+      this.currentImageOffset += DMA_ALIGNED(DPU_NORMS_ENTRY_LENGTH);
+    }
+    int nrFields = 0;
+    for (FieldInfo fieldInfo : fieldInfos) {
+      if (fieldInfo.getIndexOptions() == IndexOptions.NONE) {
+        continue;
+      }
+      nrFields++;
+    }
+    int emptyOutputsOffsetStart = this.currentImageOffset + nrFields * DMA_ALIGNED(DPU_FIELD_READER_LENGTH);
+    int emptyOutputsOffset = emptyOutputsOffsetStart;
+    int emptyOutputsLength = 0;
+    for (FieldInfo fieldInfo : fieldInfos) {
+      if (fieldInfo.getIndexOptions() == IndexOptions.NONE) {
+        continue;
+      }
 
+      DpuFieldReader fieldReader = fieldReaders.get(fieldInfo.number);
+      emptyOutputsLength += 4 + ((fieldReader.index.getEmptyOutput().length + 3) & ~3);
+    }
+    write(emptyOutputsLength, this.memoryImage, searchContextOffset + DPU_CONTEXT_EMPTY_OUTPUTS_LENGTH_OFFSET);
+    int fstContentsOffset = emptyOutputsOffset + emptyOutputsLength;
 
-    // todo(UPMEM)
-    // throw new RuntimeException("UPMEM not implemented");
+    for (FieldInfo fieldInfo : fieldInfos) {
+      if (fieldInfo.getIndexOptions() == IndexOptions.NONE) {
+        continue;
+      }
+
+      DpuFieldReader fieldReader = fieldReaders.get(fieldInfo.number);
+      write(fieldReader.longsSize, this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_LONGS_SIZE_OFFSET);
+      write(fieldReader.docCount, this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_DOC_COUNT_OFFSET);
+      write(fieldReader.sumTotalTermFreq, this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_SUM_TOTAL_TERM_FREQ_OFFSET);
+      write(emptyOutputsOffset - emptyOutputsOffsetStart, this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_EMPTY_OUTPUT_OFFSET_OFFSET);
+      write(0, this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_EMPTY_OUTPUT_OFFSET);
+      write(fieldReader.index.startNode, this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_START_NODE_OFFSET);
+      int inputType = 0;
+      switch (fieldReader.index.inputType) {
+        case BYTE1:
+          inputType = 0;
+          break;
+        case BYTE2:
+          inputType = 1;
+          break;
+        case BYTE4:
+          inputType = 2;
+          break;
+      }
+      write(inputType, this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_INPUT_TYPE_OFFSET);
+      write(fstContentsOffset, this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_MRAM_START_OFFSET_OFFSET);
+      write(fieldReader.index.bytesArray.length, this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_MRAM_LENGTH_OFFSET);
+      write(fieldInfo.name, this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_NAME_OFFSET);
+      write(fieldInfo.number, this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_NUMBER_OFFSET);
+      int docValuesType = 0;
+      switch (fieldInfo.getDocValuesType()) {
+        case NONE:
+          docValuesType = 0;
+          break;
+        case NUMERIC:
+          docValuesType = 1;
+          break;
+        case BINARY:
+          docValuesType = 2;
+          break;
+        case SORTED:
+          docValuesType = 3;
+          break;
+        case SORTED_NUMERIC:
+          docValuesType = 4;
+          break;
+        case SORTED_SET:
+          docValuesType = 5;
+          break;
+      }
+      write(docValuesType, this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_DOC_VALUES_TYPE_OFFSET);
+      write(fieldInfo.hasVectors(), this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_STORE_TERM_VECTOR_OFFSET);
+      write(fieldInfo.omitsNorms(), this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_OMITS_NORMS_OFFSET);
+      int indexOptions = 0;
+      switch (fieldInfo.getIndexOptions()) {
+        case NONE:
+          indexOptions = 0;
+          break;
+        case DOCS:
+          indexOptions = 1;
+          break;
+        case DOCS_AND_FREQS:
+          indexOptions = 2;
+          break;
+        case DOCS_AND_FREQS_AND_POSITIONS:
+          indexOptions = 3;
+          break;
+        case DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS:
+          indexOptions = 4;
+          break;
+      }
+      write(indexOptions, this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_INDEX_OPTIONS_OFFSET);
+      write(fieldInfo.hasPayloads(), this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_STORE_PAYLOADS_OFFSET);
+      write(fieldInfo.getDocValuesGen(), this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_DV_GEN_OFFSET);
+      write(fieldInfo.getPointDataDimensionCount(), this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_POINT_DATA_DIMENSION_COUNT_OFFSET);
+      write(fieldInfo.getPointIndexDimensionCount(), this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_POINT_INDEX_DIMENSION_COUNT_OFFSET);
+      write(fieldInfo.getPointNumBytes(), this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_POINT_NUM_BYTES_OFFSET);
+      write(fieldInfo.isSoftDeletesField(), this.memoryImage, this.currentImageOffset + DPU_FIELD_READER_SOFT_DELETES_FIELD_OFFSET);
+      write(fieldReader.index.bytesArray, this.memoryImage, fstContentsOffset);
+      fstContentsOffset += fieldReader.index.bytesArray.length;
+      write(fieldReader.index.getEmptyOutput().length, this.memoryImage, emptyOutputsOffset);
+      write(fieldReader.index.getEmptyOutput().bytes, this.memoryImage, emptyOutputsOffset + 4);
+      emptyOutputsOffset += 4 + ((fieldReader.index.getEmptyOutput().length + 3) & ~3);
+
+      this.currentImageOffset = DMA_ALIGNED(this.currentImageOffset + DPU_FIELD_READER_LENGTH);
+    }
+
+    this.currentImageOffset = DMA_ALIGNED(fstContentsOffset);
+    write(DPU_NULL, this.memoryImage, searchContextOffset + DPU_CONTEXT_EMPTY_OUTPUTS_OFFSET);
+    
+    int termsInLength = (int) termsIn.length();
+    byte[] termsInBuffer = new byte[termsInLength];
+    long termsInPos = termsIn.getFilePointer();
+    termsIn.seek(0);
+    termsIn.readBytes(termsInBuffer, 0, termsInLength);
+    termsIn.seek(termsInPos);
+    write(termsInBuffer, this.memoryImage, this.currentImageOffset);
+    write(this.currentImageOffset, this.memoryImage, searchContextOffset + DPU_CONTEXT_TERMS_IN_OFFSET + DPU_MRAM_READER_INDEX_OFFSET);
+    write(this.currentImageOffset, this.memoryImage, searchContextOffset + DPU_CONTEXT_TERMS_IN_OFFSET + DPU_MRAM_READER_BASE_OFFSET);
+    write(DPU_NULL, this.memoryImage, searchContextOffset + DPU_CONTEXT_TERMS_IN_OFFSET + DPU_MRAM_READER_CACHE_OFFSET);
+    this.currentImageOffset += DMA_ALIGNED(termsInLength);
+    
+    int docInLength = (int) docIn.length();
+    byte[] docInBuffer = new byte[docInLength];
+    long docInPos = docIn.getFilePointer();
+    docIn.seek(0);
+    docIn.readBytes(docInBuffer, 0, docInLength);
+    docIn.seek(docInPos);
+    write(docInBuffer, this.memoryImage, this.currentImageOffset);
+    write(this.currentImageOffset, this.memoryImage, searchContextOffset + DPU_CONTEXT_DOC_READER_OFFSET + DPU_MRAM_READER_INDEX_OFFSET);
+    write(this.currentImageOffset, this.memoryImage, searchContextOffset + DPU_CONTEXT_DOC_READER_OFFSET + DPU_MRAM_READER_BASE_OFFSET);
+    write(DPU_NULL, this.memoryImage, searchContextOffset + DPU_CONTEXT_DOC_READER_OFFSET + DPU_MRAM_READER_CACHE_OFFSET);
+    this.currentImageOffset += DMA_ALIGNED(docInLength);
+
+    int normsDataLength = (int) normsData.length();
+    byte[] normsDataBuffer = new byte[normsDataLength];
+    long normsDataPos = normsData.getFilePointer();
+    normsData.seek(0);
+    normsData.readBytes(normsDataBuffer, 0, normsDataLength);
+    normsData.seek(normsDataPos);
+    write(normsDataBuffer, this.memoryImage, this.currentImageOffset);
+    write(this.currentImageOffset, this.memoryImage, searchContextOffset + DPU_CONTEXT_NORMS_DATA_OFFSET + DPU_MRAM_READER_INDEX_OFFSET);
+    write(this.currentImageOffset, this.memoryImage, searchContextOffset + DPU_CONTEXT_NORMS_DATA_OFFSET + DPU_MRAM_READER_BASE_OFFSET);
+    write(DPU_NULL, this.memoryImage, searchContextOffset + DPU_CONTEXT_NORMS_DATA_OFFSET + DPU_MRAM_READER_CACHE_OFFSET);
+    this.currentImageOffset += DMA_ALIGNED(normsDataLength);
 
     this.currentThreadId++;
 
@@ -176,28 +426,17 @@ public final class DpuManager {
     }
   }
 
-  private static int numBytesPerValue(long min, long max) {
-    if (min >= max) {
-      return 0;
-    } else if (min >= Byte.MIN_VALUE && max <= Byte.MAX_VALUE) {
-      return 1;
-    } else if (min >= Short.MIN_VALUE && max <= Short.MAX_VALUE) {
-      return 2;
-    } else if (min >= Integer.MIN_VALUE && max <= Integer.MAX_VALUE) {
-      return 4;
-    } else {
-      return 8;
-    }
-  }
-
-  public void finalizeIndexLoading() {
+  public void finalizeIndexLoading() throws IOException {
     if (this.currentImageOffset != 0) {
       loadMemoryImage();
     }
     this.indexLoaded = true;
   }
 
-  private void loadMemoryImage() {
+  private void loadMemoryImage() throws IOException {
+    Files.write(Paths.get("mram_" + this.currentRankId + "_" + this.currentCiId + "_" + this.currentDpuId + ".bin"),
+        this.memoryImage);
+
     this.ranks[this.currentRankId]
         .get(this.currentCiId, this.currentDpuId)
         .copyToMram(MEMORY_IMAGE_OFFSET, this.memoryImage, this.currentImageOffset);
@@ -247,8 +486,10 @@ public final class DpuManager {
     }
   }
 
-  public List<DpuResult> search(int fieldId, BytesRef target) {
-    assert this.indexLoaded : "UPMEM calling search() before loading index";
+  public List<DpuResult> search(int fieldId, BytesRef target) throws IOException {
+    if (!this.indexLoaded) {
+      finalizeIndexLoading();
+    }
 
     loadQuery(fieldId, target);
     return doSearch();
@@ -378,12 +619,28 @@ public final class DpuManager {
   }
 
   private static void write(String data, byte[] buffer, int offset) {
+    System.out.println("0x" + Integer.toHexString(offset));
     byte[] bytes = data.getBytes(Charset.defaultCharset());
     System.arraycopy(bytes, 0, buffer, offset, bytes.length);
     buffer[offset + bytes.length] = '\0';
   }
 
+  private static void write(byte[] data, byte[] buffer, int offset) {
+    System.out.println("0x" + Integer.toHexString(offset));
+    System.arraycopy(data, 0, buffer, offset, data.length);
+  }
+
+  private static void write(int[] data, byte[] buffer, int offset) {
+    System.out.println("0x" + Integer.toHexString(offset));
+    ByteBuffer byteBuffer = ByteBuffer.allocate(data.length * 4).order(ByteOrder.LITTLE_ENDIAN);
+    IntBuffer intBuffer = byteBuffer.asIntBuffer();
+    intBuffer.put(data);
+    byte[] bytes = byteBuffer.array();
+    System.arraycopy(bytes, 0, buffer, offset, bytes.length);
+  }
+
   private static void write(long data, byte[] buffer, int offset) {
+    System.out.println("0x" + Integer.toHexString(offset));
     buffer[offset + 0] = (byte) ((data >>  0) & 0xffL);
     buffer[offset + 1] = (byte) ((data >>  8) & 0xffL);
     buffer[offset + 2] = (byte) ((data >> 16) & 0xffL);
@@ -395,6 +652,7 @@ public final class DpuManager {
   }
 
   private static void write(int data, byte[] buffer, int offset) {
+    System.out.println("0x" + Integer.toHexString(offset));
     buffer[offset + 0] = (byte) ((data >>  0) & 0xff);
     buffer[offset + 1] = (byte) ((data >>  8) & 0xff);
     buffer[offset + 2] = (byte) ((data >> 16) & 0xff);
@@ -402,15 +660,18 @@ public final class DpuManager {
   }
 
   private static void write(short data, byte[] buffer, int offset) {
+    System.out.println("0x" + Integer.toHexString(offset));
     buffer[offset + 0] = (byte) ((data >>  0) & 0xff);
     buffer[offset + 1] = (byte) ((data >>  8) & 0xff);
   }
 
   private static void write(byte data, byte[] buffer, int offset) {
+    System.out.println("0x" + Integer.toHexString(offset));
     buffer[offset] = data;
   }
 
   private static void write(boolean data, byte[] buffer, int offset) {
+    System.out.println("0x" + Integer.toHexString(offset));
     buffer[offset] = (byte) (data ? 1 : 0);
   }
 

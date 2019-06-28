@@ -21,15 +21,19 @@ package org.apache.lucene.util.packed;
 /**
  * Non-specialized {@link BulkOperation} for {@link PackedInts.Format#PACKED}.
  */
-class BulkOperationPacked extends BulkOperation {
+// UPMEM change: package -> public
+public class BulkOperationPacked extends BulkOperation {
 
-  private final int bitsPerValue;
+  // UPMEM change: private -> public
+  public final int bitsPerValue;
   private final int longBlockCount;
   private final int longValueCount;
   private final int byteBlockCount;
   private final int byteValueCount;
-  private final long mask;
-  private final int intMask;
+  // UPMEM change: private -> public
+  public final long mask;
+  // UPMEM change: private -> public
+  public final int intMask;
 
   public BulkOperationPacked(int bitsPerValue) {
     this.bitsPerValue = bitsPerValue;

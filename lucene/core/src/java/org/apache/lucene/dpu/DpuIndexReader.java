@@ -21,16 +21,27 @@
 package org.apache.lucene.dpu;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.TreeMap;
 
 import com.upmem.dpu.host.api.DpuException;
+import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.FieldInfosFormat;
 import org.apache.lucene.codecs.FieldsProducer;
+import org.apache.lucene.codecs.NormsProducer;
+import org.apache.lucene.codecs.PostingsFormat;
+import org.apache.lucene.codecs.PostingsReaderBase;
+import org.apache.lucene.codecs.lucene50.ForUtil;
+import org.apache.lucene.codecs.lucene50.Lucene50PostingsReader;
+import org.apache.lucene.codecs.lucene80.Lucene80NormsProducer;
 import org.apache.lucene.index.BinaryDocValues;
-import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.Fields;
+import org.apache.lucene.index.IndexFileNames;
+import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.LeafMetaData;
 import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.NumericDocValues;
@@ -45,7 +56,14 @@ import org.apache.lucene.index.StoredFieldVisitor;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IOContext;
+import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.util.Bits;
+import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.IOUtils;
+
+import static org.apache.lucene.codecs.blocktree.BlockTreeTermsReader.VERSION_AUTO_PREFIX_TERMS_REMOVED;
+import static org.apache.lucene.codecs.blocktree.BlockTreeTermsReader.VERSION_CURRENT;
+import static org.apache.lucene.codecs.blocktree.BlockTreeTermsReader.VERSION_START;
 
 public final class DpuIndexReader extends LeafReader {
   private final Directory directory;
@@ -56,6 +74,8 @@ public final class DpuIndexReader extends LeafReader {
 
   private final int numDocs;
   private final int maxDoc;
+
+  private IndexInput termsIn;
 
   public DpuIndexReader(Directory directory, SegmentInfos sis) throws DpuException, IOException {
     this.directory = directory;
@@ -70,18 +90,27 @@ public final class DpuIndexReader extends LeafReader {
       Directory dir;
 
       if (si.info.getUseCompoundFile()) {
-        dir = si.info.getCodec().compoundFormat().getCompoundReader(si.info.dir, si.info, IOContext.READONCE);
+        dir = si.info.getCodec().compoundFormat().getCompoundReader(si.info.dir, si.info, IOContext.DEFAULT);
       } else {
         dir = si.info.dir;
       }
 
       FieldInfosFormat fisFormat = si.info.getCodec().fieldInfosFormat();
-      FieldInfos fieldInfos = fisFormat.read(dir, si.info, "", IOContext.READONCE);
+      FieldInfos fieldInfos = fisFormat.read(dir, si.info, "", IOContext.DEFAULT);
 
-      final SegmentReadState segmentReadState = new SegmentReadState(dir, si.info, fieldInfos, IOContext.READONCE);
-      FieldsProducer fieldsProducer = si.info.getCodec().postingsFormat().fieldsProducer(segmentReadState);
+      final SegmentReadState segmentReadState = new SegmentReadState(dir, si.info, fieldInfos, IOContext.DEFAULT);
+      PostingsFormat postingsFormat = si.info.getCodec().postingsFormat();
+      FieldsProducer fieldsProducer = postingsFormat.fieldsProducer(segmentReadState);
 
-      this.dpuManager.loadSegment(segmentNumber, fieldInfos);
+      Lucene80NormsProducer normsProducer = (Lucene80NormsProducer) si.info.getCodec().normsFormat().normsProducer(segmentReadState);
+
+      SegmentReadState lucene50State = new SegmentReadState(segmentReadState, "Lucene50_0");
+      Lucene50PostingsReader postingsReader = new Lucene50PostingsReader(lucene50State);
+
+      Map<Integer, DpuFieldReader> fieldReaders = fetchFieldReaders(postingsReader, lucene50State);
+
+      this.dpuManager.loadSegment(segmentNumber, fieldInfos, fieldReaders, postingsReader.forUtil, this.termsIn,
+          postingsReader.docIn, normsProducer.data);
 
       for (FieldInfo fieldInfo : fieldInfos) {
         String fieldName = fieldInfo.name;
@@ -217,5 +246,128 @@ public final class DpuIndexReader extends LeafReader {
   @Override
   public CacheHelper getReaderCacheHelper() {
     throw new RuntimeException("UPMEM not implemented");
+  }
+
+  /** Extension of terms file */
+  static final String TERMS_EXTENSION = "tim";
+  static final String TERMS_CODEC_NAME = "BlockTreeTermsDict";
+
+  /** Extension of terms index file */
+  static final String TERMS_INDEX_EXTENSION = "tip";
+  static final String TERMS_INDEX_CODEC_NAME = "BlockTreeTermsIndex";
+
+  private Map<Integer, DpuFieldReader> fetchFieldReaders(PostingsReaderBase postingsReader, SegmentReadState state) throws IOException {
+    // This is almost a copy of the BlockTreeTermsReader constructor function
+    Map<Integer, DpuFieldReader> fields = new HashMap<>();
+    boolean success = false;
+    IndexInput indexIn = null;
+
+    String segment = state.segmentInfo.name;
+
+    String termsName = IndexFileNames.segmentFileName(segment, state.segmentSuffix, TERMS_EXTENSION);
+    try {
+      termsIn = state.directory.openInput(termsName, state.context);
+      int version = CodecUtil.checkIndexHeader(termsIn, TERMS_CODEC_NAME, VERSION_START, VERSION_CURRENT, state.segmentInfo.getId(), state.segmentSuffix);
+
+      if (version < VERSION_AUTO_PREFIX_TERMS_REMOVED) {
+        // pre-6.2 index, records whether auto-prefix terms are enabled in the header
+        byte b = termsIn.readByte();
+        if (b != 0) {
+          throw new CorruptIndexException("Index header pretends the index has auto-prefix terms: " + b, termsIn);
+        }
+      }
+
+      String indexName = IndexFileNames.segmentFileName(segment, state.segmentSuffix, TERMS_INDEX_EXTENSION);
+      indexIn = state.directory.openInput(indexName, state.context);
+      CodecUtil.checkIndexHeader(indexIn, TERMS_INDEX_CODEC_NAME, version, version, state.segmentInfo.getId(), state.segmentSuffix);
+      CodecUtil.checksumEntireFile(indexIn);
+
+      // Have PostingsReader init itself
+      postingsReader.init(termsIn, state);
+
+      // NOTE: data file is too costly to verify checksum against all the bytes on open,
+      // but for now we at least verify proper structure of the checksum footer: which looks
+      // for FOOTER_MAGIC + algorithmID. This is cheap and can detect some forms of corruption
+      // such as file truncation.
+      CodecUtil.retrieveChecksum(termsIn);
+
+      // Read per-field details
+      seekDir(termsIn);
+      seekDir(indexIn);
+
+      final int numFields = termsIn.readVInt();
+      if (numFields < 0) {
+        throw new CorruptIndexException("invalid numFields: " + numFields, termsIn);
+      }
+
+      for (int i = 0; i < numFields; ++i) {
+        final int field = termsIn.readVInt();
+        final long numTerms = termsIn.readVLong();
+        if (numTerms <= 0) {
+          throw new CorruptIndexException("Illegal numTerms for field number: " + field, termsIn);
+        }
+        final BytesRef rootCode = readBytesRef(termsIn);
+        final FieldInfo fieldInfo = state.fieldInfos.fieldInfo(field);
+        if (fieldInfo == null) {
+          throw new CorruptIndexException("invalid field number: " + field, termsIn);
+        }
+        final long sumTotalTermFreq = termsIn.readVLong();
+        // when frequencies are omitted, sumDocFreq=sumTotalTermFreq and only one value is written.
+        final long sumDocFreq = fieldInfo.getIndexOptions() == IndexOptions.DOCS ? sumTotalTermFreq : termsIn.readVLong();
+        final int docCount = termsIn.readVInt();
+        final int longsSize = termsIn.readVInt();
+        if (longsSize < 0) {
+          throw new CorruptIndexException("invalid longsSize for field: " + fieldInfo.name + ", longsSize=" + longsSize, termsIn);
+        }
+        BytesRef minTerm = readBytesRef(termsIn);
+        BytesRef maxTerm = readBytesRef(termsIn);
+        if (docCount < 0 || docCount > state.segmentInfo.maxDoc()) { // #docs with field must be <= #docs
+          throw new CorruptIndexException("invalid docCount: " + docCount + " maxDoc: " + state.segmentInfo.maxDoc(), termsIn);
+        }
+        if (sumDocFreq < docCount) {  // #postings must be >= #docs with field
+          throw new CorruptIndexException("invalid sumDocFreq: " + sumDocFreq + " docCount: " + docCount, termsIn);
+        }
+        if (sumTotalTermFreq < sumDocFreq) { // #positions must be >= #postings
+          throw new CorruptIndexException("invalid sumTotalTermFreq: " + sumTotalTermFreq + " sumDocFreq: " + sumDocFreq, termsIn);
+        }
+        final long indexStartFP = indexIn.readVLong();
+        DpuFieldReader previous = fields.put(fieldInfo.number,
+            new DpuFieldReader(this, fieldInfo, numTerms, rootCode, sumTotalTermFreq, sumDocFreq, docCount,
+                indexStartFP, longsSize, indexIn, minTerm, maxTerm));
+        if (previous != null) {
+          throw new CorruptIndexException("duplicate field: " + fieldInfo.name, termsIn);
+        }
+      }
+
+      indexIn.close();
+      success = true;
+    } finally {
+      if (!success) {
+        IOUtils.closeWhileHandlingException(indexIn);
+      }
+    }
+
+    return fields;
+  }
+
+  private static BytesRef readBytesRef(IndexInput in) throws IOException {
+    int numBytes = in.readVInt();
+    if (numBytes < 0) {
+      throw new CorruptIndexException("invalid bytes length: " + numBytes, in);
+    }
+
+    BytesRef bytes = new BytesRef();
+    bytes.length = numBytes;
+    bytes.bytes = new byte[numBytes];
+    in.readBytes(bytes.bytes, 0, numBytes);
+
+    return bytes;
+  }
+
+  /** Seek {@code input} to the directory offset. */
+  private static void seekDir(IndexInput input) throws IOException {
+    input.seek(input.length() - CodecUtil.footerLength() - 8);
+    long offset = input.readLong();
+    input.seek(offset);
   }
 }

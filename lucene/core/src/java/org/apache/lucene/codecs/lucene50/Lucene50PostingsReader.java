@@ -60,11 +60,13 @@ public final class Lucene50PostingsReader extends PostingsReaderBase {
 
   private static final long BASE_RAM_BYTES_USED = RamUsageEstimator.shallowSizeOfInstance(Lucene50PostingsReader.class);
 
-  private final IndexInput docIn;
+  // UPMEM change: private -> public
+  public final IndexInput docIn;
   private final IndexInput posIn;
   private final IndexInput payIn;
 
-  final ForUtil forUtil;
+  // UPMEM change: package -> public
+  public final ForUtil forUtil;
   private int version;
 
   /** Sole constructor. */

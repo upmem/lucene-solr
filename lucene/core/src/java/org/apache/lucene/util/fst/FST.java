@@ -128,9 +128,11 @@ public final class FST<T> implements Accountable {
   final BytesStore bytes;
 
   /** Used at read time when the FST fits into a single byte[]. */
-  final byte[] bytesArray;
+  // UPMEM change: package -> public
+  public final byte[] bytesArray;
 
-  private long startNode = -1;
+  // UPMEM change: private -> public
+  public long startNode = -1;
 
   public final Outputs<T> outputs;
 

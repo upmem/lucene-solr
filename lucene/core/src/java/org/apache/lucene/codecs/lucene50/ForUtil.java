@@ -33,7 +33,8 @@ import static org.apache.lucene.codecs.lucene50.Lucene50PostingsFormat.BLOCK_SIZ
  * Encode all values in normal area with fixed bit width, 
  * which is determined by the max value in this block.
  */
-final class ForUtil {
+// UPMEM change: package -> public
+public final class ForUtil {
 
   /**
    * Special number of bits per value used whenever all values to encode are equal.
@@ -88,10 +89,13 @@ final class ForUtil {
     return (int) byteCount;
   }
 
-  private final int[] encodedSizes;
+  // UPMEM change: private -> public
+  public final int[] encodedSizes;
   private final PackedInts.Encoder[] encoders;
-  private final PackedInts.Decoder[] decoders;
-  private final int[] iterations;
+  // UPMEM change: private -> public
+  public final PackedInts.Decoder[] decoders;
+  // UPMEM change: private -> public
+  public final int[] iterations;
 
   /**
    * Create a new {@link ForUtil} instance and save state into <code>out</code>.
