@@ -619,19 +619,16 @@ public final class DpuManager {
   }
 
   private static void write(String data, byte[] buffer, int offset) {
-    System.out.println("0x" + Integer.toHexString(offset));
     byte[] bytes = data.getBytes(Charset.defaultCharset());
     System.arraycopy(bytes, 0, buffer, offset, bytes.length);
     buffer[offset + bytes.length] = '\0';
   }
 
   private static void write(byte[] data, byte[] buffer, int offset) {
-    System.out.println("0x" + Integer.toHexString(offset));
     System.arraycopy(data, 0, buffer, offset, data.length);
   }
 
   private static void write(int[] data, byte[] buffer, int offset) {
-    System.out.println("0x" + Integer.toHexString(offset));
     ByteBuffer byteBuffer = ByteBuffer.allocate(data.length * 4).order(ByteOrder.LITTLE_ENDIAN);
     IntBuffer intBuffer = byteBuffer.asIntBuffer();
     intBuffer.put(data);
@@ -640,7 +637,6 @@ public final class DpuManager {
   }
 
   private static void write(long data, byte[] buffer, int offset) {
-    System.out.println("0x" + Integer.toHexString(offset));
     buffer[offset + 0] = (byte) ((data >>  0) & 0xffL);
     buffer[offset + 1] = (byte) ((data >>  8) & 0xffL);
     buffer[offset + 2] = (byte) ((data >> 16) & 0xffL);
@@ -652,7 +648,6 @@ public final class DpuManager {
   }
 
   private static void write(int data, byte[] buffer, int offset) {
-    System.out.println("0x" + Integer.toHexString(offset));
     buffer[offset + 0] = (byte) ((data >>  0) & 0xff);
     buffer[offset + 1] = (byte) ((data >>  8) & 0xff);
     buffer[offset + 2] = (byte) ((data >> 16) & 0xff);
@@ -660,18 +655,15 @@ public final class DpuManager {
   }
 
   private static void write(short data, byte[] buffer, int offset) {
-    System.out.println("0x" + Integer.toHexString(offset));
     buffer[offset + 0] = (byte) ((data >>  0) & 0xff);
     buffer[offset + 1] = (byte) ((data >>  8) & 0xff);
   }
 
   private static void write(byte data, byte[] buffer, int offset) {
-    System.out.println("0x" + Integer.toHexString(offset));
     buffer[offset] = data;
   }
 
   private static void write(boolean data, byte[] buffer, int offset) {
-    System.out.println("0x" + Integer.toHexString(offset));
     buffer[offset] = (byte) (data ? 1 : 0);
   }
 
