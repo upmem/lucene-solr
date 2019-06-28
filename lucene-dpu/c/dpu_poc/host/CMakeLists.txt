@@ -16,7 +16,7 @@ file(GLOB SOURCES *.c x86_process/*.c)
 set(DPU_PROJECT_RELATIVE_PATH ../dpu)
 set(DPU_BINARY ${CMAKE_CURRENT_BINARY_DIR}/${DPU_PROJECT_RELATIVE_PATH}/dpu)
 
-set(DPU_HOST_LIBRARIES dpu-debug dpucni-debug)
+set(DPU_HOST_LIBRARIES dpu-debug)
 
 add_executable(dpuhost_poc ${SOURCES})
 target_compile_definitions(dpuhost_poc PUBLIC DPU_BINARY=${DPU_BINARY})

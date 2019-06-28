@@ -10,8 +10,8 @@
 #include "segment_files.h"
 
 typedef struct {
-    dpu_rank_t rank;
-    dpu_t dpu;
+    struct dpu_rank_t *rank;
+    struct dpu_t *dpu;
 } dpu_system_t;
 
 dpu_system_t *initialize_dpu_system(const char *dpu_binary, dpu_type_t dpu_type, char* dpu_profile);

@@ -19,7 +19,8 @@
 
 int main(int argc, char **argv) {
     if (argc != 2) {
-        fprintf(stderr, "usage: %s <index directory> <segment number>\n", basename(argv[0]));
+        fprintf(stderr, "usage: %s <index directory>\n", basename(argv[0]));
+        /* fprintf(stderr, "usage: %s <index directory> <segment number>\n", basename(argv[0])); */
         return 1;
     }
 
