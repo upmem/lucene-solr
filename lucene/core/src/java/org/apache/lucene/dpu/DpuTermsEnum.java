@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.lucene.index.Impacts;
 import org.apache.lucene.index.ImpactsEnum;
 import org.apache.lucene.index.PostingsEnum;
 import org.apache.lucene.index.TermsEnum;
@@ -32,9 +33,7 @@ import org.apache.lucene.util.BytesRef;
 public final class DpuTermsEnum extends TermsEnum {
   private final DpuTerms terms;
 
-  private List<DpuManager.DpuResult> results;
-  private int resultIndex;
-  private int maxResults;
+  private DpuManager.DpuResults results;
 
   DpuTermsEnum(DpuTerms terms) {
     this.terms = terms;
@@ -43,10 +42,7 @@ public final class DpuTermsEnum extends TermsEnum {
   @Override
   public boolean seekExact(BytesRef target) throws IOException {
     this.results = this.terms.indexReader.dpuManager.search(this.terms.fieldNumber, target);
-    this.resultIndex = 0;
-    this.maxResults = this.results.size();
-
-    return goToNextResult() != -1;
+    return this.results.docFreq != 0;
   }
 
   @Override
@@ -61,12 +57,12 @@ public final class DpuTermsEnum extends TermsEnum {
 
   @Override
   public int docFreq() throws IOException {
-    return this.results.get(this.resultIndex).getDocFreq();
+    return this.results.docFreq;
   }
 
   @Override
   public long totalTermFreq() throws IOException {
-    return this.results.get(this.resultIndex).getTotalTermFreq();
+    return this.results.totalTermFreq;
   }
 
   @Override
@@ -76,39 +72,87 @@ public final class DpuTermsEnum extends TermsEnum {
 
   @Override
   public ImpactsEnum impacts(int flags) throws IOException {
-    throw new RuntimeException("UPMEM not implemented");
+    if (PostingsEnum.featureRequested(flags, PostingsEnum.POSITIONS)) {
+      throw new RuntimeException("UPMEM not implemented");
+    }
+
+    return new ImpactsEnum() {
+      private int docId = -1;
+      private int freq;
+
+      private Iterator<DpuManager.DpuDocResult> iterator = DpuTermsEnum.this.results.results.iterator();
+
+      @Override
+      public void advanceShallow(int target) throws IOException {
+        throw new RuntimeException("UPMEM not implemented");
+      }
+
+      @Override
+      public Impacts getImpacts() throws IOException {
+        throw new RuntimeException("UPMEM not implemented");
+      }
+
+      @Override
+      public int freq() throws IOException {
+        return this.freq;
+      }
+
+      @Override
+      public int nextPosition() throws IOException {
+        throw new RuntimeException("UPMEM not implemented");
+      }
+
+      @Override
+      public int startOffset() throws IOException {
+        throw new RuntimeException("UPMEM not implemented");
+      }
+
+      @Override
+      public int endOffset() throws IOException {
+        throw new RuntimeException("UPMEM not implemented");
+      }
+
+      @Override
+      public BytesRef getPayload() throws IOException {
+        throw new RuntimeException("UPMEM not implemented");
+      }
+
+      @Override
+      public int docID() {
+        return this.docId;
+      }
+
+      @Override
+      public int nextDoc() throws IOException {
+        int nextDoc;
+        if (this.iterator.hasNext()) {
+          DpuManager.DpuDocResult docResult = this.iterator.next();
+          nextDoc = docResult.docId;
+          this.freq = docResult.freq;
+        } else {
+          nextDoc = NO_MORE_DOCS;
+        }
+        this.docId = nextDoc;
+        return nextDoc;
+      }
+
+      @Override
+      public int advance(int target) throws IOException {
+        int doc;
+        while ((doc = nextDoc()) < target) {}
+        return doc;
+      }
+
+      @Override
+      public long cost() {
+        throw new RuntimeException("UPMEM not implemented");
+      }
+    };
   }
 
   @Override
   public BytesRef next() throws IOException {
     throw new RuntimeException("UPMEM not implemented");
-  }
-
-  private int goToNextResult() {
-    assert (this.results != null) : "UPMEM calling next() before doing a search";
-
-    if (this.resultIndex == this.maxResults) {
-      return -1;
-    }
-
-    int docId;
-
-    while (true) {
-      DpuManager.DpuResult result = this.results.get(this.resultIndex);
-      docId = result.next();
-
-      if (docId != -1) {
-        break;
-      }
-
-      if (this.resultIndex == (this.maxResults - 1)) {
-        break;
-      }
-
-      this.resultIndex++;
-    }
-
-    return docId;
   }
 
   @Override

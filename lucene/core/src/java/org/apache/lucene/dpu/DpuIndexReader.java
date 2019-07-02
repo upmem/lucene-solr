@@ -21,7 +21,9 @@
 package org.apache.lucene.dpu;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -32,6 +34,7 @@ import org.apache.lucene.codecs.FieldsProducer;
 import org.apache.lucene.codecs.NormsProducer;
 import org.apache.lucene.codecs.PostingsFormat;
 import org.apache.lucene.codecs.PostingsReaderBase;
+import org.apache.lucene.codecs.StoredFieldsReader;
 import org.apache.lucene.codecs.lucene50.ForUtil;
 import org.apache.lucene.codecs.lucene50.Lucene50PostingsReader;
 import org.apache.lucene.codecs.lucene80.Lucene80NormsProducer;
@@ -71,16 +74,18 @@ public final class DpuIndexReader extends LeafReader {
 
   final DpuManager dpuManager;
   private final TreeMap<String, DpuTerms> fields;
+  private final TreeMap<String, List<NumericDocValues>> norms;
 
   private final int numDocs;
   private final int maxDoc;
-
-  private IndexInput termsIn;
+  private final List<StoredFieldsReader> storedFieldsReaders;
 
   public DpuIndexReader(Directory directory, SegmentInfos sis) throws DpuException, IOException {
     this.directory = directory;
     this.segmentInfos = sis;
     this.fields = new TreeMap<>();
+    this.norms = new TreeMap<>();
+    this.storedFieldsReaders = new ArrayList<>();
     this.dpuManager = new DpuManager(sis.size());
 
     int maxDoc = 0;
@@ -102,33 +107,37 @@ public final class DpuIndexReader extends LeafReader {
       PostingsFormat postingsFormat = si.info.getCodec().postingsFormat();
       FieldsProducer fieldsProducer = postingsFormat.fieldsProducer(segmentReadState);
 
+      this.storedFieldsReaders.add(si.info.getCodec().storedFieldsFormat().fieldsReader(dir, si.info, fieldInfos, IOContext.DEFAULT));
+
       Lucene80NormsProducer normsProducer = (Lucene80NormsProducer) si.info.getCodec().normsFormat().normsProducer(segmentReadState);
 
       SegmentReadState lucene50State = new SegmentReadState(segmentReadState, "Lucene50_0");
       Lucene50PostingsReader postingsReader = new Lucene50PostingsReader(lucene50State);
 
-      Map<Integer, DpuFieldReader> fieldReaders = fetchFieldReaders(postingsReader, lucene50State);
+      Map<Integer, DpuFieldReader> fieldReaders = new HashMap<>();
+      IndexInput termsIn = fetchFieldReaders(postingsReader, lucene50State, fieldReaders);
 
-      this.dpuManager.loadSegment(segmentNumber, fieldInfos, fieldReaders, postingsReader.forUtil, this.termsIn,
-          postingsReader.docIn, normsProducer.data);
+      this.dpuManager.loadSegment(segmentNumber, fieldInfos, fieldReaders, postingsReader.forUtil, termsIn,
+          postingsReader.docIn, normsProducer.data, normsProducer.norms);
 
       for (FieldInfo fieldInfo : fieldInfos) {
         String fieldName = fieldInfo.name;
         Terms terms = fieldsProducer.terms(fieldName);
 
-        if (terms == null) {
-          continue;
+        if (terms != null) {
+          DpuTerms dpuTerms = this.fields.computeIfAbsent(fieldName, k -> new DpuTerms(this, fieldInfo.number));
+
+          dpuTerms.add(fieldInfo.number, terms.getSumTotalTermFreq(), terms.getSumDocFreq(), terms.getDocCount(),
+              terms.hasFreqs(), terms.hasOffsets(), terms.hasPositions(), terms.hasPayloads());
         }
 
-        DpuTerms dpuTerms = this.fields.get(fieldName);
+        if (normsProducer.norms.get(fieldInfo.number) != null) {
+          NumericDocValues norms = normsProducer.getNorms(fieldInfo);
 
-        if (dpuTerms == null) {
-          dpuTerms = new DpuTerms(this, fieldInfo.number);
-          this.fields.put(fieldName, dpuTerms);
+          List<NumericDocValues> storedNorms = this.norms.computeIfAbsent(fieldName, k -> new ArrayList<>());
+
+          storedNorms.add(norms);
         }
-
-        dpuTerms.add(fieldInfo.number, terms.getSumTotalTermFreq(), terms.getSumDocFreq(), terms.getDocCount(),
-            terms.hasFreqs(), terms.hasOffsets(), terms.hasPositions(), terms.hasPayloads());
       }
       numDocs += si.info.maxDoc() - si.getDelCount();
       maxDoc += si.info.maxDoc();
@@ -190,6 +199,16 @@ public final class DpuIndexReader extends LeafReader {
 
   @Override
   public NumericDocValues getNormValues(String field) throws IOException {
+    List<NumericDocValues> norms = this.norms.get(field);
+
+    if ((norms == null) || (norms.size() == 0)) {
+      return null;
+    }
+
+    if (norms.size() == 1) {
+      return norms.get(0);
+    }
+
     throw new RuntimeException("UPMEM not implemented");
   }
 
@@ -200,7 +219,7 @@ public final class DpuIndexReader extends LeafReader {
 
   @Override
   public Bits getLiveDocs() {
-    throw new RuntimeException("UPMEM not implemented");
+    return null;
   }
 
   @Override
@@ -235,7 +254,9 @@ public final class DpuIndexReader extends LeafReader {
 
   @Override
   public void document(int docID, StoredFieldVisitor visitor) throws IOException {
-    throw new RuntimeException("UPMEM not implemented");
+    for (StoredFieldsReader storedFieldsReader : this.storedFieldsReaders) {
+      storedFieldsReader.visitDocument(docID, visitor);
+    }
   }
 
   @Override
@@ -256,15 +277,15 @@ public final class DpuIndexReader extends LeafReader {
   static final String TERMS_INDEX_EXTENSION = "tip";
   static final String TERMS_INDEX_CODEC_NAME = "BlockTreeTermsIndex";
 
-  private Map<Integer, DpuFieldReader> fetchFieldReaders(PostingsReaderBase postingsReader, SegmentReadState state) throws IOException {
+  private IndexInput fetchFieldReaders(PostingsReaderBase postingsReader, SegmentReadState state, Map<Integer, DpuFieldReader> fields) throws IOException {
     // This is almost a copy of the BlockTreeTermsReader constructor function
-    Map<Integer, DpuFieldReader> fields = new HashMap<>();
     boolean success = false;
     IndexInput indexIn = null;
 
     String segment = state.segmentInfo.name;
 
     String termsName = IndexFileNames.segmentFileName(segment, state.segmentSuffix, TERMS_EXTENSION);
+    IndexInput termsIn;
     try {
       termsIn = state.directory.openInput(termsName, state.context);
       int version = CodecUtil.checkIndexHeader(termsIn, TERMS_CODEC_NAME, VERSION_START, VERSION_CURRENT, state.segmentInfo.getId(), state.segmentSuffix);
@@ -347,7 +368,7 @@ public final class DpuIndexReader extends LeafReader {
       }
     }
 
-    return fields;
+    return termsIn;
   }
 
   private static BytesRef readBytesRef(IndexInput in) throws IOException {

@@ -32,6 +32,8 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +46,7 @@ import com.upmem.dpujni.DpuDescription;
 import com.upmem.dpujni.DpuMramTransfer;
 import com.upmem.properties.DpuType;
 import org.apache.lucene.codecs.lucene50.ForUtil;
+import org.apache.lucene.codecs.lucene80.Lucene80NormsProducer;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.IndexOptions;
@@ -54,7 +57,7 @@ import org.apache.lucene.util.packed.PackedInts;
 
 public final class DpuManager {
   private static final DpuType DEFAULT_DPU_TYPE = DpuType.simulator;
-  private static final String DEFAULT_DPU_PROFILE = "";
+  private static final String DEFAULT_DPU_PROFILE = "enableDbgLib=true";
   private static final String DPU_SEARCH_PROGRAM = "org/apache/lucene/dpu/term_search.dpu";
   private static final int SYSTEM_THREAD = 0;
   private static final int NR_THREADS = 1;
@@ -170,6 +173,8 @@ public final class DpuManager {
   private final byte[] memoryImage;
   private boolean indexLoaded;
 
+  private final Map<Integer, Integer> fieldIdMapping;
+
   public DpuManager(int nrOfSegments) throws DpuException, IOException {
     this(nrOfSegments, DEFAULT_DPU_TYPE, DEFAULT_DPU_PROFILE);
   }
@@ -193,10 +198,13 @@ public final class DpuManager {
     this.memoryImage = new byte[this.description.mramSizeInBytes];
     this.currentImageOffset = SEGMENTS_OFFSET;
     this.indexLoaded = false;
+
+    this.fieldIdMapping = new HashMap<>();
   }
 
   public void loadSegment(int segmentNumber, FieldInfos fieldInfos, Map<Integer, DpuFieldReader> fieldReaders,
-                          ForUtil forUtil, IndexInput termsIn, IndexInput docIn, IndexInput normsData) throws IOException {
+                          ForUtil forUtil, IndexInput termsIn, IndexInput docIn, IndexInput normsData,
+                          Map<Integer, Lucene80NormsProducer.NormsEntry> norms) throws IOException {
     assert this.currentRankId < this.ranks.length : "UPMEM too many segments for the number of allocated DPUs";
 
     int offsetAddress = SEGMENT_SUMMARY_OFFSET + this.currentThreadId * SEGMENT_SUMMARY_ENTRY_SIZE;
@@ -253,11 +261,22 @@ public final class DpuManager {
     write(forUtil.iterations, this.memoryImage, searchContextOffset + DPU_CONTEXT_FOR_UTIL_OFFSET + DPU_FOR_UTIL_ITERATIONS_OFFSET);
     this.currentImageOffset = DMA_ALIGNED(this.currentImageOffset + DPU_CONTEXT_LENGTH);
     for (int eachFieldId = 0; eachFieldId < maxFieldId + 1; eachFieldId++) {
-      // todo(UPMEM) write norms
+      Lucene80NormsProducer.NormsEntry normsEntry = norms.get(eachFieldId);
+
+      if (normsEntry != null) {
+        write(normsEntry.docsWithFieldOffset, this.memoryImage, this.currentImageOffset + DPU_NORMS_ENTRY_DOCS_WITH_FIELD_OFFSET_OFFSET);
+        write(normsEntry.docsWithFieldLength, this.memoryImage, this.currentImageOffset + DPU_NORMS_ENTRY_DOCS_WITH_FIELD_LENGTH_OFFSET);
+        write(normsEntry.jumpTableEntryCount, this.memoryImage, this.currentImageOffset + DPU_NORMS_ENTRY_JUMP_TABLE_ENTRY_COUNT_OFFSET);
+        write(normsEntry.numDocsWithField, this.memoryImage, this.currentImageOffset + DPU_NORMS_ENTRY_NUM_DOCS_WITH_FIELD_OFFSET);
+        write(normsEntry.bytesPerNorm, this.memoryImage, this.currentImageOffset + DPU_NORMS_ENTRY_BYTES_PER_NORM_OFFSET);
+        write(normsEntry.normsOffset, this.memoryImage, this.currentImageOffset + DPU_NORMS_ENTRY_NORMS_OFFSET_OFFSET);
+      }
+
       this.currentImageOffset += DMA_ALIGNED(DPU_NORMS_ENTRY_LENGTH);
     }
     int nrFields = 0;
     for (FieldInfo fieldInfo : fieldInfos) {
+      this.fieldIdMapping.put(fieldInfo.number, nrFields);
       if (fieldInfo.getIndexOptions() == IndexOptions.NONE) {
         continue;
       }
@@ -442,55 +461,36 @@ public final class DpuManager {
         .copyToMram(MEMORY_IMAGE_OFFSET, this.memoryImage, this.currentImageOffset);
   }
 
-  final static class DpuResult {
-    byte[] outputs = new byte[OUTPUTS_BUFFER_SIZE];
-    byte[] idfOutput = new byte[IDF_OUTPUT_SIZE];
+  final static class DpuResults {
+    int docFreq = 0;
+    long totalTermFreq = 0;
 
-    private int currentThreadId = 0;
-    private int currentOffset = 0;
-    private boolean finished = false;
+    java.util.PriorityQueue<DpuDocResult> results = new java.util.PriorityQueue<>(Comparator.comparingInt(o -> o.docId));
+  }
 
-    int next() {
-      if (finished) {
-        return -1;
-      }
+  final static class DpuDocResult {
+    int docId;
+    int freq;
+    int docNorm;
 
-      int docId;
-
-      while (true) {
-        docId = readInt(outputs, currentOffset + DPU_OUTPUT_DOC_ID_OFFSET);
-
-        if (docId != -1) {
-          currentOffset += DPU_OUTPUT_LENGTH;
-          break;
-        }
-
-        if (currentThreadId == (NR_THREADS - 1)) {
-          finished = true;
-          break;
-        }
-
-        currentThreadId++;
-        currentOffset = currentThreadId * OUTPUTS_PER_THREAD;
-      }
-
-      return docId;
-    }
-
-    public int getDocFreq() {
-      return readInt(idfOutput, DPU_IDF_OUTPUT_DOC_FREQ_OFFSET);
-    }
-
-    public long getTotalTermFreq() {
-      return readLong(idfOutput, DPU_IDF_OUTPUT_TOTAL_TERM_FREQ_OFFSET);
+    public DpuDocResult(int docId, int freq, int docNorm) {
+      this.docId = docId;
+      this.freq = freq;
+      this.docNorm = docNorm;
     }
   }
 
-  public List<DpuResult> search(int fieldId, BytesRef target) throws IOException {
+  final static class RawDpuResult {
+    byte[] outputs = new byte[OUTPUTS_BUFFER_SIZE];
+    byte[] idfOutput = new byte[IDF_OUTPUT_SIZE];
+  }
+
+  public DpuResults search(int fieldId, BytesRef target) throws IOException {
     if (!this.indexLoaded) {
       finalizeIndexLoading();
     }
 
+    fieldId = this.fieldIdMapping.get(fieldId);
     loadQuery(fieldId, target);
     return doSearch();
   }
@@ -517,9 +517,9 @@ public final class DpuManager {
     }
   }
 
-  private List<DpuResult> doSearch() {
-    List<DpuResult> results = new ArrayList<>(this.ranks.length * this.description.nrOfControlInterfaces *
-        this.description.nrOfControlInterfaces);
+  private DpuResults doSearch() {
+    DpuResults results = new DpuResults();
+    List<RawDpuResult> resultList = new ArrayList<>(this.description.nrOfControlInterfaces * this.description.nrOfControlInterfaces);
 
     //todo(UPMEM) only boot used DPUs ?
     for (DpuRank rank : this.ranks) {
@@ -545,21 +545,30 @@ public final class DpuManager {
           if (runBitfield[eachCi] != 0) {
             if (faultBitfield[eachCi] != 0) {
               faulting = true;
+
+              for (int eachDpu = 0; eachDpu < this.description.nrOfDpusPerControlInterface; eachDpu++) {
+                if ((faultBitfield[eachCi] & (1 << eachDpu)) != 0) {
+                  System.out.println(rank.get(eachCi, eachDpu).coreDump().report());
+                }
+              }
             } else {
               stopped = false;
             }
           }
         }
 
-        if (stopped) {
+        if (faulting) {
+          faultyRanks.add(rank);
+          newlyStoppedRanks.add(rank);
+        } else if (stopped) {
           newlyStoppedRanks.add(rank);
 
           DpuMramTransfer outputsTransfer = new DpuMramTransfer(this.description.nrOfControlInterfaces, this.description.nrOfDpusPerControlInterface);
           DpuMramTransfer idfOutputsTransfer = new DpuMramTransfer(this.description.nrOfControlInterfaces, this.description.nrOfDpusPerControlInterface);
           for (int eachCi = 0; eachCi < this.description.nrOfControlInterfaces; eachCi++) {
             for (int eachDpu = 0; eachDpu < this.description.nrOfDpusPerControlInterface; eachDpu++) {
-              DpuResult result = new DpuResult();
-              results.add(result);
+              RawDpuResult result = new RawDpuResult();
+              resultList.add(result);
               outputsTransfer.add(eachCi, eachDpu, OUTPUTS_BUFFER_OFFSET, result.outputs);
               idfOutputsTransfer.add(eachCi, eachDpu, IDF_OUTPUT_OFFSET, result.idfOutput);
             }
@@ -567,9 +576,35 @@ public final class DpuManager {
 
           rank.copyFromMrams(outputsTransfer);
           rank.copyFromMrams(idfOutputsTransfer);
-        } else if (faulting) {
-          faultyRanks.add(rank);
-          newlyStoppedRanks.add(rank);
+
+          for (RawDpuResult result : resultList) {
+            results.docFreq += readInt(result.idfOutput, DPU_IDF_OUTPUT_DOC_FREQ_OFFSET);
+            results.totalTermFreq += readLong(result.idfOutput, DPU_IDF_OUTPUT_TOTAL_TERM_FREQ_OFFSET);
+
+            boolean finished = false;
+            int currentOffset = 0;
+            int currentThreadId = 0;
+            do {
+              int docId = readInt(result.outputs, currentOffset + DPU_OUTPUT_DOC_ID_OFFSET);
+
+              if (docId == -1) {
+                if (currentThreadId == (NR_THREADS - 1)) {
+                  finished = true;
+                }
+
+                currentThreadId++;
+                currentOffset = currentThreadId * OUTPUTS_PER_THREAD;
+              } else {
+                int freq = readInt(result.outputs, currentOffset + DPU_OUTPUT_FREQ_OFFSET);
+                int docNorm = readInt(result.outputs, currentOffset + DPU_OUTPUT_DOC_NORM_OFFSET);
+
+                results.results.add(new DpuDocResult(docId, freq, docNorm));
+                currentOffset += DPU_OUTPUT_LENGTH;
+              }
+            } while (!finished);
+          }
+
+          resultList.clear();
         }
       }
 
