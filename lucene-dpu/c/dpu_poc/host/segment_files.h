@@ -14,6 +14,7 @@ typedef struct {
 } mram_image_t;
 
 mram_image_t *mram_image_new();
+void mram_image_reset(mram_image_t *mram_image);
 bool load_segment_files(mram_image_t *mram_image,
                         const char* index_directory,
                         uint32_t segment_number,

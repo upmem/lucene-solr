@@ -27,6 +27,12 @@ mram_image_t *mram_image_new() {
     return image;
 }
 
+void mram_image_reset(mram_image_t *mram_image) {
+    mram_image->nr_segments = 0;
+    mram_image->current_offset = SEGMENTS_OFFSET;
+    memset(mram_image->content + QUERY_BUFFER_OFFSET, 0, QUERY_BUFFER_SIZE);
+}
+
 void free_mram_image(mram_image_t *mram_image) {
     free(mram_image->content);
     free(mram_image);

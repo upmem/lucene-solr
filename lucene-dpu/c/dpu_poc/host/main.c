@@ -33,19 +33,21 @@ int main(int argc, char **argv) {
 
     DIR* directory = opendir(index_directory);
     struct dirent* file;
-    uint32_t idx = 0;
+    uint32_t current_segment_idx = 0;
     while ((file = readdir(directory))) {
         size_t len = strlen(file->d_name);
         if ((len >= 3) && (strcmp(".si", file->d_name + len - 3) == 0)) {
-            segment_suffixes = realloc(segment_suffixes, (idx + 1) * sizeof(*segment_suffixes));
-            segment_suffixes[idx] = malloc(len - 3);
-            memcpy(segment_suffixes[idx], file->d_name + 1, len - 4);
-            segment_suffixes[idx][len - 4] = '\0';
-            idx++;
+            segment_suffixes = realloc(segment_suffixes, (current_segment_idx + 1) * sizeof(*segment_suffixes));
+            segment_suffixes[current_segment_idx] = malloc(len - 3);
+            memcpy(segment_suffixes[current_segment_idx], file->d_name + 1, len - 4);
+            segment_suffixes[current_segment_idx][len - 4] = '\0';
+            current_segment_idx++;
         }
     }
 
-    dpu_system_t *dpu_system = initialize_dpu_system(DPU_BINARY_PATH, DPU_TYPE, DPU_PROFILE);
+    uint32_t nr_segments = current_segment_idx;
+    uint32_t nr_dpus = (nr_segments / NR_THREADS) + (((nr_segments % NR_THREADS) == 0) ? 0 : 1);
+    dpu_system_t *dpu_system = initialize_dpu_system(nr_dpus, DPU_BINARY_PATH, DPU_TYPE, DPU_PROFILE);
 
     if (dpu_system == NULL) {
         return 2;
@@ -61,23 +63,34 @@ int main(int argc, char **argv) {
     unsigned int nb_fields_per_thread[NR_THREADS];
     char **fields_name_per_thread[NR_THREADS];
     unsigned each_thread;
-    for (each_thread = 0; each_thread < NR_THREADS; each_thread++) {
-        if (!load_segment_files(mram_image,
-                                index_directory,
-                                each_thread,
-                                segment_suffixes[each_thread],
-                                &nb_fields_per_thread[each_thread],
-                                &fields_name_per_thread[each_thread])) {
+    unsigned each_dpu;
+    current_segment_idx = 0;
+    for (each_dpu = 0; each_dpu < nr_dpus; each_dpu++) {
+        for (each_thread = 0; each_thread < NR_THREADS; each_thread++) {
+            if (current_segment_idx == nr_segments) {
+                break;
+            }
+
+            if (!load_segment_files(mram_image,
+                                    index_directory,
+                                    each_thread,
+                                    segment_suffixes[current_segment_idx],
+                                    &nb_fields_per_thread[each_thread],
+                                    &fields_name_per_thread[each_thread])) {
+                free_mram_image(mram_image);
+                free_dpu_system(dpu_system);
+                return 4;
+            }
+            current_segment_idx++;
+        }
+
+        if (!prepare_mram_with_segments(dpu_system, each_dpu, mram_image)) {
             free_mram_image(mram_image);
             free_dpu_system(dpu_system);
-            return 4;
+            return 5;
         }
-    }
 
-    if (!prepare_mrams_with_segments(dpu_system, mram_image)) {
-        free_mram_image(mram_image);
-        free_dpu_system(dpu_system);
-        return 5;
+        mram_image_reset(mram_image);
     }
 
 //    search(dpu_system, "contents", "stupid", true, nb_fields_per_thread, fields_name_per_thread);
@@ -93,7 +106,7 @@ int main(int argc, char **argv) {
     }
     free_mram_image(mram_image);
     free_dpu_system(dpu_system);
-    for (int i = 0; i < idx; ++i) {
+    for (int i = 0; i < nr_segments; ++i) {
         free(segment_suffixes[i]);
     }
     free(segment_suffixes);
