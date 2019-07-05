@@ -44,9 +44,9 @@ static norms_reader_t *build_norms_producer(lucene_global_context_t *ctx) {
                             field_infos);
 }
 
-lucene_global_context_t *fetch_lucene_global_context(char *path, uint32_t segment_id) {
+lucene_global_context_t *fetch_lucene_global_context(char *path, uint32_t segment_id, const char* segment_suffix) {
     lucene_global_context_t *ctx = malloc(sizeof(*ctx));
-    ctx->file_buffers = get_file_buffers(path, segment_id);
+    ctx->file_buffers = get_file_buffers(path, segment_id, segment_suffix);
     ctx->field_infos = read_field_infos(ctx->file_buffers + LUCENE_FILE_FNM);
     ctx->term_reader = build_fields_producer(ctx);
     ctx->norms_reader = build_norms_producer(ctx);

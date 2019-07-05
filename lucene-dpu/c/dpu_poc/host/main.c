@@ -1,6 +1,8 @@
 #include <dpu.h>
 #include <stdlib.h>
 #include <libgen.h>
+#include <dirent.h>
+#include <string.h>
 #include <dpu_characteristics.h>
 #include "segment_files.h"
 #include "dpu_system.h"
@@ -27,6 +29,22 @@ int main(int argc, char **argv) {
     char *index_directory = argv[1];
     /* uint32_t segment_number = (uint32_t) atoi(argv[2]); */
 
+    char** segment_suffixes = NULL;
+
+    DIR* directory = opendir(index_directory);
+    struct dirent* file;
+    uint32_t idx = 0;
+    while ((file = readdir(directory))) {
+        size_t len = strlen(file->d_name);
+        if ((len >= 3) && (strcmp(".si", file->d_name + len - 3) == 0)) {
+            segment_suffixes = realloc(segment_suffixes, (idx + 1) * sizeof(*segment_suffixes));
+            segment_suffixes[idx] = malloc(len - 3);
+            memcpy(segment_suffixes[idx], file->d_name + 1, len - 4);
+            segment_suffixes[idx][len - 4] = '\0';
+            idx++;
+        }
+    }
+
     dpu_system_t *dpu_system = initialize_dpu_system(DPU_BINARY_PATH, DPU_TYPE, DPU_PROFILE);
 
     if (dpu_system == NULL) {
@@ -47,6 +65,7 @@ int main(int argc, char **argv) {
         if (!load_segment_files(mram_image,
                                 index_directory,
                                 each_thread,
+                                segment_suffixes[each_thread],
                                 &nb_fields_per_thread[each_thread],
                                 &fields_name_per_thread[each_thread])) {
             free_mram_image(mram_image);
@@ -61,7 +80,8 @@ int main(int argc, char **argv) {
         return 5;
     }
 
-    search(dpu_system, "contents", "stupid", true, nb_fields_per_thread, fields_name_per_thread);
+//    search(dpu_system, "contents", "stupid", true, nb_fields_per_thread, fields_name_per_thread);
+    search(dpu_system, "contents", "license", true, nb_fields_per_thread, fields_name_per_thread);
 //    search(dpu_system, "contents", "patent", true);
 //    search(dpu_system, "contents", "lucene", true);
 //    search(dpu_system, "contents", "gnu", true);
@@ -73,6 +93,9 @@ int main(int argc, char **argv) {
     }
     free_mram_image(mram_image);
     free_dpu_system(dpu_system);
-
+    for (int i = 0; i < idx; ++i) {
+        free(segment_suffixes[i]);
+    }
+    free(segment_suffixes);
     return 0;
 }

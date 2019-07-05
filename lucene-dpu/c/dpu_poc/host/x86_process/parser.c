@@ -47,12 +47,12 @@ static lucene_file_e extension_to_index(uint8_t *file_name) {
 }
 
 static FILE *file_open(char *path,
-                       unsigned int segment_id,
+                       const char* segment_suffix,
                        char *filename,
                        lucene_file_e file_type,
                        lucene_si_file_t *si_file) {
     char suffix_filename[STRING_MAX_SIZE];
-    sprintf(suffix_filename, "_%u%s\0", segment_id, lucene_file_extension[file_type]);
+    sprintf(suffix_filename, "_%s%s\0", segment_suffix, lucene_file_extension[file_type]);
     check_file_in_si(si_file, suffix_filename);
 
     sprintf(filename, "%s/%s\0", path, suffix_filename);
@@ -60,7 +60,7 @@ static FILE *file_open(char *path,
 }
 
 static void generate_file_buffers_from_cfs(char *path,
-                                           unsigned int segment_id,
+                                           const char* segment_suffix,
                                            char *filename,
                                            file_buffer_t *file_buffers,
                                            lucene_si_file_t *si_file) {
@@ -71,7 +71,7 @@ static void generate_file_buffers_from_cfs(char *path,
     size_t cfs_file_size;
     uint8_t *cfs_buffer;
 
-    f_cfe = file_open(path, segment_id, filename, LUCENE_FILE_CFE, si_file);
+    f_cfe = file_open(path, segment_suffix, filename, LUCENE_FILE_CFE, si_file);
     assert(f_cfe != NULL && "CFE FILE NOT FOUND");
 
     cfe_file = parse_cfe_file(f_cfe);
@@ -80,7 +80,7 @@ static void generate_file_buffers_from_cfs(char *path,
 
     fclose(f_cfe);
 
-    f_cfs = file_open(path, segment_id, filename, LUCENE_FILE_CFS, si_file);
+    f_cfs = file_open(path, segment_suffix, filename, LUCENE_FILE_CFS, si_file);
     assert(f_cfs != NULL && "CFS FILE NOT FOUND");
 
     fseek(f_cfs, 0, SEEK_END);
@@ -105,13 +105,13 @@ static void generate_file_buffers_from_cfs(char *path,
     free_cfe_file(cfe_file);
 }
 
-file_buffer_t *get_file_buffers(char *path, unsigned int segment_id) {
+file_buffer_t *get_file_buffers(char *path, unsigned int segment_id, const char* segment_suffix) {
     char filename[STRING_MAX_SIZE];
     FILE *f_si;
     lucene_si_file_t *si_file;
     file_buffer_t *file_buffers = calloc(LUCENE_FILE_ENUM_LENGTH, sizeof(*file_buffers));
 
-    sprintf(filename, "%s/_%u%s", path, segment_id, lucene_file_extension[LUCENE_FILE_SI]);
+    sprintf(filename, "%s/_%s%s", path, segment_suffix, lucene_file_extension[LUCENE_FILE_SI]);
     f_si = fopen(filename, "r");
     assert(f_si != NULL && "SI FILE NOT FOUND");
     si_file = parse_si_file(f_si);
@@ -120,7 +120,7 @@ file_buffer_t *get_file_buffers(char *path, unsigned int segment_id) {
     fclose(f_si);
 
     if (si_file->IsCompoundFile) {
-        generate_file_buffers_from_cfs(path, segment_id, filename, file_buffers, si_file);
+        generate_file_buffers_from_cfs(path, segment_suffix, filename, file_buffers, si_file);
     } else {
         printf("to be implemented\n");
         assert(0);

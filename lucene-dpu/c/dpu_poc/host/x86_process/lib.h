@@ -21,6 +21,6 @@ typedef struct {
     for_util_t *for_util;
 } lucene_global_context_t;
 
-lucene_global_context_t *fetch_lucene_global_context(char *path, uint32_t segment_id);
+lucene_global_context_t *fetch_lucene_global_context(char *path, uint32_t segment_id, const char* segment_suffix);
 
 #endif //DPU_POC_LIB_H

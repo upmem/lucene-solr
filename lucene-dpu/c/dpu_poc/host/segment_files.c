@@ -35,6 +35,7 @@ void free_mram_image(mram_image_t *mram_image) {
 bool load_segment_files(mram_image_t *mram_image,
                         const char* index_directory,
                         uint32_t segment_number,
+                        const char* segment_suffix,
                         unsigned int *nb_field,
                         char ***field_names) {
     if (mram_image->nr_segments == NR_THREADS) {
@@ -44,7 +45,7 @@ bool load_segment_files(mram_image_t *mram_image,
     uint32_t offset_address = SEGMENT_SUMMARY_OFFSET + mram_image->nr_segments * SEGMENT_SUMMARY_ENTRY_SIZE;
     *((uint64_t *)(mram_image->content + offset_address)) = (mram_image->current_offset & 0xffffffffl) | (((uint64_t) segment_number) << 32);
 
-    lucene_global_context_t *global_context = fetch_lucene_global_context((char *) index_directory, segment_number);
+    lucene_global_context_t *global_context = fetch_lucene_global_context((char *) index_directory, segment_number, segment_suffix);
     flat_search_context_t *search_context = (flat_search_context_t *) (mram_image->content + mram_image->current_offset);
     mram_image->current_offset += sizeof(*search_context);
 

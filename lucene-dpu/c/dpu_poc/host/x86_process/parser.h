@@ -36,7 +36,7 @@ typedef struct {
     uint8_t *content;
 } file_buffer_t;
 
-file_buffer_t *get_file_buffers(char *path, unsigned int segment_id);
+file_buffer_t *get_file_buffers(char *path, unsigned int segment_id, const char* segment_suffix);
 
 void free_file_buffers(file_buffer_t *file_buffers);
 

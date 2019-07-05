@@ -17,6 +17,7 @@ mram_image_t *mram_image_new();
 bool load_segment_files(mram_image_t *mram_image,
                         const char* index_directory,
                         uint32_t segment_number,
+                        const char* segment_suffix,
                         unsigned int *nb_field,
                         char ***field_names);
 void free_mram_image(mram_image_t *mram_image);
