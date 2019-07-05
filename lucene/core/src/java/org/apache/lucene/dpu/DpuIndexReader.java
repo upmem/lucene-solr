@@ -75,6 +75,7 @@ public final class DpuIndexReader extends LeafReader {
   final DpuManager dpuManager;
   private final TreeMap<String, DpuTerms> fields;
   private final TreeMap<String, List<NumericDocValues>> norms;
+  private final List<Integer> docBases;
 
   private final int numDocs;
   private final int maxDoc;
@@ -85,6 +86,7 @@ public final class DpuIndexReader extends LeafReader {
     this.segmentInfos = sis;
     this.fields = new TreeMap<>();
     this.norms = new TreeMap<>();
+    this.docBases = new ArrayList<>();
     this.storedFieldsReaders = new ArrayList<>();
     this.dpuManager = new DpuManager(sis.size());
 
@@ -92,6 +94,7 @@ public final class DpuIndexReader extends LeafReader {
     int numDocs = 0;
     int segmentNumber = 0;
     for (SegmentCommitInfo si : sis) {
+      this.docBases.add(maxDoc);
       Directory dir;
 
       if (si.info.getUseCompoundFile()) {
@@ -117,7 +120,7 @@ public final class DpuIndexReader extends LeafReader {
       Map<Integer, DpuFieldReader> fieldReaders = new HashMap<>();
       IndexInput termsIn = fetchFieldReaders(postingsReader, lucene50State, fieldReaders);
 
-      this.dpuManager.loadSegment(segmentNumber, fieldInfos, fieldReaders, postingsReader.forUtil, termsIn,
+      this.dpuManager.loadSegment(segmentNumber, maxDoc, fieldInfos, fieldReaders, postingsReader.forUtil, termsIn,
           postingsReader.docIn, normsProducer.data, normsProducer.norms);
 
       for (FieldInfo fieldInfo : fieldInfos) {
@@ -209,7 +212,104 @@ public final class DpuIndexReader extends LeafReader {
       return norms.get(0);
     }
 
-    throw new RuntimeException("UPMEM not implemented");
+    return new NumericDocValues() {
+      private int nextLeaf;
+      private NumericDocValues currentValues;
+      private int currentDocBase;
+      private int docID = -1;
+
+      @Override
+      public int nextDoc() throws IOException {
+        while (true) {
+          if (currentValues == null) {
+            if (nextLeaf == norms.size()) {
+              docID = NO_MORE_DOCS;
+              return docID;
+            }
+            currentDocBase = docBases.get(nextLeaf);
+            currentValues = norms.get(nextLeaf);
+            nextLeaf++;
+            continue;
+          }
+
+          int newDocID = currentValues.nextDoc();
+
+          if (newDocID == NO_MORE_DOCS) {
+            currentValues = null;
+            continue;
+          } else {
+            docID = currentDocBase + newDocID;
+            return docID;
+          }
+        }
+      }
+
+      @Override
+      public int docID() {
+        return docID;
+      }
+
+      @Override
+      public int advance(int targetDocID) throws IOException {
+        if (targetDocID <= docID) {
+          throw new IllegalArgumentException("can only advance beyond current document: on docID=" + docID + " but targetDocID=" + targetDocID);
+        }
+        int readerIndex = subIndex(targetDocID, docBases);
+        if (readerIndex >= nextLeaf) {
+          if (readerIndex == norms.size()) {
+            currentValues = null;
+            docID = NO_MORE_DOCS;
+            return docID;
+          }
+          currentDocBase = docBases.get(readerIndex);
+          currentValues = norms.get(readerIndex);
+          if (currentValues == null) {
+            return nextDoc();
+          }
+          nextLeaf = readerIndex+1;
+        }
+        int newDocID = currentValues.advance(targetDocID - currentDocBase);
+        if (newDocID == NO_MORE_DOCS) {
+          currentValues = null;
+          return nextDoc();
+        } else {
+          docID = currentDocBase + newDocID;
+          return docID;
+        }
+      }
+
+      @Override
+      public boolean advanceExact(int targetDocID) throws IOException {
+        if (targetDocID < docID) {
+          throw new IllegalArgumentException("can only advance beyond current document: on docID=" + docID + " but targetDocID=" + targetDocID);
+        }
+        int readerIndex = subIndex(targetDocID, docBases);
+        if (readerIndex >= nextLeaf) {
+          if (readerIndex == norms.size()) {
+            throw new IllegalArgumentException("Out of range: " + targetDocID);
+          }
+          currentDocBase = docBases.get(readerIndex);
+          currentValues = norms.get(readerIndex);
+          nextLeaf = readerIndex+1;
+        }
+        docID = targetDocID;
+        if (currentValues == null) {
+          return false;
+        }
+        return currentValues.advanceExact(targetDocID - currentDocBase);
+      }
+
+      @Override
+      public long longValue() throws IOException {
+        return currentValues.longValue();
+      }
+
+      @Override
+      public long cost() {
+        // TODO
+        return 0;
+      }
+    };
   }
 
   @Override
@@ -254,9 +354,11 @@ public final class DpuIndexReader extends LeafReader {
 
   @Override
   public void document(int docID, StoredFieldVisitor visitor) throws IOException {
-    for (StoredFieldsReader storedFieldsReader : this.storedFieldsReaders) {
-      storedFieldsReader.visitDocument(docID, visitor);
+    int readerIndex = subIndex(docID, this.docBases);
+    if (readerIndex == this.storedFieldsReaders.size()) {
+      throw new IllegalArgumentException("Out of range: " + docID);
     }
+    this.storedFieldsReaders.get(readerIndex).visitDocument(docID - this.docBases.get(readerIndex), visitor);
   }
 
   @Override
@@ -276,6 +378,28 @@ public final class DpuIndexReader extends LeafReader {
   /** Extension of terms index file */
   static final String TERMS_INDEX_EXTENSION = "tip";
   static final String TERMS_INDEX_CODEC_NAME = "BlockTreeTermsIndex";
+
+  private static int subIndex(int n, List<Integer> docBases) { // find
+    // searcher/reader for doc n:
+    int size = docBases.size();
+    int lo = 0; // search starts array
+    int hi = size - 1; // for first element less than n, return its index
+    while (hi >= lo) {
+      int mid = (lo + hi) >>> 1;
+      int midValue = docBases.get(mid);
+      if (n < midValue)
+        hi = mid - 1;
+      else if (n > midValue)
+        lo = mid + 1;
+      else { // found a match
+        while (mid + 1 < size && docBases.get(mid + 1) == midValue) {
+          mid++; // scan to last match
+        }
+        return mid;
+      }
+    }
+    return hi;
+  }
 
   private IndexInput fetchFieldReaders(PostingsReaderBase postingsReader, SegmentReadState state, Map<Integer, DpuFieldReader> fields) throws IOException {
     // This is almost a copy of the BlockTreeTermsReader constructor function

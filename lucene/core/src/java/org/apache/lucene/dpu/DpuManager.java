@@ -60,7 +60,7 @@ public final class DpuManager {
   private static final String DEFAULT_DPU_PROFILE = "enableDbgLib=true";
   private static final String DPU_SEARCH_PROGRAM = "org/apache/lucene/dpu/term_search.dpu";
   private static final int SYSTEM_THREAD = 0;
-  private static final int NR_THREADS = 1;
+  private static final int NR_THREADS = 10;
   private static final int MEMORY_IMAGE_OFFSET = 0;
   private static final int IDF_OUTPUT_OFFSET = 0;
   private static final int IDF_OUTPUT_SIZE = 16;
@@ -165,6 +165,8 @@ public final class DpuManager {
   private final DpuRank[] ranks;
   private final DpuDescription description;
 
+  private final Map<DpuRank, int[][][]> docBases;
+
   private int currentRankId;
   private int currentCiId;
   private int currentDpuId;
@@ -195,6 +197,8 @@ public final class DpuManager {
       this.ranks[rankIndex].load(program);
     }
 
+    this.docBases = new HashMap<>();
+
     this.memoryImage = new byte[this.description.mramSizeInBytes];
     this.currentImageOffset = SEGMENTS_OFFSET;
     this.indexLoaded = false;
@@ -202,10 +206,15 @@ public final class DpuManager {
     this.fieldIdMapping = new HashMap<>();
   }
 
-  public void loadSegment(int segmentNumber, FieldInfos fieldInfos, Map<Integer, DpuFieldReader> fieldReaders,
+  public void loadSegment(int segmentNumber, int docBase, FieldInfos fieldInfos, Map<Integer, DpuFieldReader> fieldReaders,
                           ForUtil forUtil, IndexInput termsIn, IndexInput docIn, IndexInput normsData,
                           Map<Integer, Lucene80NormsProducer.NormsEntry> norms) throws IOException {
     assert this.currentRankId < this.ranks.length : "UPMEM too many segments for the number of allocated DPUs";
+
+    int[][][] rankDocBases = this.docBases.computeIfAbsent(this.ranks[this.currentRankId], k ->
+        new int[this.description.nrOfControlInterfaces][this.description.nrOfDpusPerControlInterface][NR_THREADS]);
+
+    rankDocBases[this.currentCiId][this.currentDpuId][this.currentThreadId] = docBase;
 
     int offsetAddress = SEGMENT_SUMMARY_OFFSET + this.currentThreadId * SEGMENT_SUMMARY_ENTRY_SIZE;
     long offset = (this.currentImageOffset & 0xffffffffL) | ((segmentNumber & 0xffffffffL) << 32);
@@ -481,8 +490,16 @@ public final class DpuManager {
   }
 
   final static class RawDpuResult {
+    int ciId;
+    int dpuId;
+
     byte[] outputs = new byte[OUTPUTS_BUFFER_SIZE];
     byte[] idfOutput = new byte[IDF_OUTPUT_SIZE];
+
+    public RawDpuResult(int ciId, int dpuId) {
+      this.ciId = ciId;
+      this.dpuId = dpuId;
+    }
   }
 
   public DpuResults search(int fieldId, BytesRef target) throws IOException {
@@ -567,7 +584,7 @@ public final class DpuManager {
           DpuMramTransfer idfOutputsTransfer = new DpuMramTransfer(this.description.nrOfControlInterfaces, this.description.nrOfDpusPerControlInterface);
           for (int eachCi = 0; eachCi < this.description.nrOfControlInterfaces; eachCi++) {
             for (int eachDpu = 0; eachDpu < this.description.nrOfDpusPerControlInterface; eachDpu++) {
-              RawDpuResult result = new RawDpuResult();
+              RawDpuResult result = new RawDpuResult(eachCi, eachDpu);
               resultList.add(result);
               outputsTransfer.add(eachCi, eachDpu, OUTPUTS_BUFFER_OFFSET, result.outputs);
               idfOutputsTransfer.add(eachCi, eachDpu, IDF_OUTPUT_OFFSET, result.idfOutput);
@@ -593,12 +610,13 @@ public final class DpuManager {
                 }
 
                 currentThreadId++;
-                currentOffset = currentThreadId * OUTPUTS_PER_THREAD;
+                currentOffset = currentThreadId * OUTPUTS_PER_THREAD * DPU_OUTPUT_LENGTH;
               } else {
                 int freq = readInt(result.outputs, currentOffset + DPU_OUTPUT_FREQ_OFFSET);
                 int docNorm = readInt(result.outputs, currentOffset + DPU_OUTPUT_DOC_NORM_OFFSET);
 
-                results.results.add(new DpuDocResult(docId, freq, docNorm));
+                int docBase = this.docBases.get(rank)[result.ciId][result.dpuId][currentThreadId];
+                results.results.add(new DpuDocResult(docBase + docId, freq, docNorm));
                 currentOffset += DPU_OUTPUT_LENGTH;
               }
             } while (!finished);
