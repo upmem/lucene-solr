@@ -100,11 +100,20 @@ bool load_segment_files(mram_image_t *mram_image,
 
     uint32_t fst_contents_offset = empty_outputs_offset + empty_output_length;
 
-    *nb_field = global_context->term_reader->nr_fields;
-    *field_names = (char **)malloc(*nb_field * sizeof(char *));
+    bool check_fields_integrity = true;
+    if (*nb_field == -1) {
+        *nb_field = global_context->term_reader->nr_fields;
+        *field_names = calloc(*nb_field, sizeof(char *));
+        check_fields_integrity = false;
+    } else {
+        if (*nb_field != global_context->term_reader->nr_fields) {
+            fprintf(stderr, "segment does not have the same number of fields\n");
+            return false;
+        }
+    }
 
-    for (int j = 0; j < global_context->term_reader->nr_fields; ++j) {
-        field_reader_t* field_reader = global_context->term_reader->fields[j].field_reader;
+    for (int each_field = 0; each_field < global_context->term_reader->nr_fields; ++each_field) {
+        field_reader_t* field_reader = global_context->term_reader->fields[each_field].field_reader;
         flat_field_reader_t flat_reader;
 
         flat_reader.longs_size = field_reader->longs_size;
@@ -139,7 +148,15 @@ bool load_segment_files(mram_image_t *mram_image,
         empty_outputs_offset += sizeof(uint32_t) + ((field_reader->index->empty_output->length + 3) & ~3);
         memcpy(mram_image->content + mram_image->current_offset, &flat_reader, sizeof(flat_reader));
 
-        (*field_names)[j] = ((flat_field_reader_t *)(mram_image->content + mram_image->current_offset))->field_info.name;
+        char *field_name = ((flat_field_reader_t *)(mram_image->content + mram_image->current_offset))->field_info.name;
+        if (check_fields_integrity) {
+            if (strcmp((*field_names)[each_field], field_name) != 0) {
+                fprintf(stderr, "segment does not have the same field name for a field id\n");
+                return false;
+            }
+        } else {
+            (*field_names)[each_field] = strdup(field_name);
+        }
 
         mram_image->current_offset += DMA_ALIGNED(sizeof(flat_field_reader_t));
     }

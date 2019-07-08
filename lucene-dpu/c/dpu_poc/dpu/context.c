@@ -66,6 +66,11 @@ flat_search_context_t* initialize_flat_context(uint32_t index) {
     flat_search_context_t* context = flat_contexts + index;
 
     MRAM_READ(&flat_context_offsets[index], SEGMENT_SUMMARY_OFFSET + index * SEGMENT_SUMMARY_ENTRY_SIZE, SEGMENT_SUMMARY_ENTRY_SIZE);
+
+    if ((flat_context_offsets[index] & 0xffffffffl) == 0xffffffffl) {
+        return NULL;
+    }
+
     mram_readX((mram_addr_t) flat_context_offsets[index], context, sizeof(*context));
 
     uint32_t variable_length_content_size = dma_aligned(context->term_reader.nr_fields * sizeof(flat_field_reader_t))

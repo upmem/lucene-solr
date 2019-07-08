@@ -12,7 +12,7 @@
 #include "query.h"
 #include "x86_process/term_scorer.h"
 
-static bool load_query(dpu_system_t *dpu_system, const char *field, const char *value, unsigned int *, char ***);
+static bool load_query(dpu_system_t *dpu_system, const char *field, const char *value, unsigned int nb_field, char ** field_names);
 static bool process_results(dpu_system_t *dpu_system);
 static bool save_mram(dpu_system_t *dpu_system, const char* path);
 
@@ -85,9 +85,9 @@ bool search(dpu_system_t *dpu_system,
             const char *field,
             const char *value,
             bool save_memory_image,
-            unsigned int *nb_fields_per_thread,
-            char ***field_names_per_thread) {
-    if (!load_query(dpu_system, field, value, nb_fields_per_thread, field_names_per_thread)) {
+            unsigned int nb_fields,
+            char **field_names) {
+    if (!load_query(dpu_system, field, value, nb_fields, field_names)) {
         fprintf(stderr, "error when loading the query\n");
         return false;
     }
@@ -155,7 +155,7 @@ bool search(dpu_system_t *dpu_system,
     return true;
 }
 
-static bool load_query(dpu_system_t *dpu_system, const char *field, const char *value, unsigned int *nb_field, char ***field_names) {
+static bool load_query(dpu_system_t *dpu_system, const char *field, const char *value, unsigned int nb_field, char **field_names) {
     size_t value_length = strlen(value);
 
     if (value_length >= MAX_VALUE_SIZE) {
@@ -168,20 +168,9 @@ static bool load_query(dpu_system_t *dpu_system, const char *field, const char *
 
     unsigned int each_field;
     query.field_id = -1;
-    for (each_field = 0; each_field < nb_field[0]; each_field++) {
-        char *field_name = field_names[0][each_field];
+    for (each_field = 0; each_field < nb_field; each_field++) {
+        char *field_name = field_names[each_field];
         if (field_name != NULL && strcmp(field, field_name) == 0) {
-            unsigned each_thread;
-
-            /* Check to make sure that every segment have the same field name at the same id */
-            for (each_thread = 0; each_thread < NR_THREADS; each_thread++) {
-                char *field_name = field_names[each_thread][each_field];
-                if (field_name == NULL || strcmp(field, field_name) != 0) {
-                    fprintf(stderr, "segment does not have the same field name for a field id\n");
-                    return false;
-                }
-            }
-
             query.field_id = each_field;
             break;
         }

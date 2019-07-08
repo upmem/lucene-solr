@@ -2,6 +2,7 @@
  * Copyright (c) 2014-2019 - uPmem
  */
 
+#include <stddef.h>
 #include <defs.h>
 #include <perfcounter.h>
 #include <ktrace.h>
@@ -34,19 +35,26 @@ int main(void) {
 
     barrier_wait(barrier);
 
-    if (task_id != 0) {
-        query = fetch_query(false);
+    if (context == NULL) {
+        barrier_wait(barrier);
+
+        accumulate_idf_output(0, 0, 0);
+        no_search();
+    } else {
+        if (task_id != 0) {
+            query = fetch_query(false);
+        }
+
+        barrier_wait(barrier);
+
+        start = perfcounter_get();
+        search(context, query->field_id, query->value);
+        end = perfcounter_get();
+
+        ktrace("[%i] perfcounter:%u\n",
+               task_id,
+               (unsigned)(end - start));
     }
-
-    barrier_wait(barrier);
-
-    start = perfcounter_get();
-    search(context, query->field_id, query->value);
-    end = perfcounter_get();
-
-    ktrace("[%i] perfcounter:%u\n",
-           task_id,
-           (unsigned)(end - start));
 
     return 0;
 }

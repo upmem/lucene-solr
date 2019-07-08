@@ -17,6 +17,14 @@
 
 static flat_norms_entry_t norms_entries[NR_THREADS];
 
+static void finalize_results(uint32_t nb_output) {
+    unsigned int task_id = me();
+    dpu_output_t last_output = {.doc_id = 0xffffffffU};
+    MRAM_WRITE(OUTPUTS_BUFFER_OFFSET + task_id * OUTPUTS_BUFFER_SIZE_PER_THREAD + nb_output * OUTPUT_SIZE,
+               &last_output,
+               OUTPUT_SIZE);
+}
+
 void search(flat_search_context_t *ctx, uint32_t field_id, char *value) {
     unsigned int task_id = me();
     unsigned int nb_output = 0;
@@ -55,8 +63,9 @@ void search(flat_search_context_t *ctx, uint32_t field_id, char *value) {
         }
     }
 
-    dpu_output_t last_output = {.doc_id = 0xffffffffU};
-    MRAM_WRITE(OUTPUTS_BUFFER_OFFSET + task_id * OUTPUTS_BUFFER_SIZE_PER_THREAD + nb_output * OUTPUT_SIZE,
-               &last_output,
-               OUTPUT_SIZE);
+    finalize_results(nb_output);
+}
+
+void no_search() {
+    finalize_results(0);
 }

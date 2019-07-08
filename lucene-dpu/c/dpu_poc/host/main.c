@@ -60,14 +60,17 @@ int main(int argc, char **argv) {
         return 3;
     }
 
-    unsigned int nb_fields_per_thread[NR_THREADS];
-    char **fields_name_per_thread[NR_THREADS];
+    unsigned int nb_fields_per_segment = -1;
+    char **fields_name_per_segment = NULL;
     unsigned each_thread;
     unsigned each_dpu;
-    current_segment_idx = 0;
+    unsigned current_segment_idx = 0;
     for (each_dpu = 0; each_dpu < nr_dpus; each_dpu++) {
         for (each_thread = 0; each_thread < NR_THREADS; each_thread++) {
             if (current_segment_idx == nr_segments) {
+                for (int each_empty_thread = each_thread; each_empty_thread < NR_THREADS; ++each_empty_thread) {
+                    load_empty_segment(mram_image, each_empty_thread);
+                }
                 break;
             }
 
@@ -75,8 +78,8 @@ int main(int argc, char **argv) {
                                     index_directory,
                                     each_thread,
                                     segment_suffixes[current_segment_idx],
-                                    &nb_fields_per_thread[each_thread],
-                                    &fields_name_per_thread[each_thread])) {
+                                    &nb_fields_per_segment,
+                                    &fields_name_per_segment)) {
                 free_mram_image(mram_image);
                 free_dpu_system(dpu_system);
                 return 4;
@@ -93,16 +96,20 @@ int main(int argc, char **argv) {
         mram_image_reset(mram_image);
     }
 
-//    search(dpu_system, "contents", "stupid", true, nb_fields_per_thread, fields_name_per_thread);
-    search(dpu_system, "contents", "license", true, nb_fields_per_thread, fields_name_per_thread);
-//    search(dpu_system, "contents", "patent", true);
-//    search(dpu_system, "contents", "lucene", true);
-//    search(dpu_system, "contents", "gnu", true);
-//    search(dpu_system, "contents", "derivative", true);
-//    search(dpu_system, "contents", "license", true);
+    search(dpu_system, field, term, true, nb_fields_per_segment, fields_name_per_segment);
+//    search(dpu_system, "contents", "stupid", true, nb_fields_per_segment, fields_name_per_segment);
+//    search(dpu_system, "contents", "license", true, nb_fields_per_segment, fields_name_per_segment);
+//    search(dpu_system, "contents", "patent", true, nb_fields_per_segment, fields_name_per_segment);
+//    search(dpu_system, "contents", "lucene", true, nb_fields_per_segment, fields_name_per_segment);
+//    search(dpu_system, "contents", "gnu", true, nb_fields_per_segment, fields_name_per_segment);
+//    search(dpu_system, "contents", "derivative", true, nb_fields_per_segment, fields_name_per_segment);
+//    search(dpu_system, "contents", "license", true, nb_fields_per_segment, fields_name_per_segment);
 
-    for (each_thread = 0; each_thread < NR_THREADS; each_thread++) {
-        free (fields_name_per_thread[each_thread]);
+    if (fields_name_per_segment != NULL) {
+        for (int each_field = 0; each_field < nb_fields_per_segment; ++each_field) {
+            free(fields_name_per_segment[each_field]);
+        }
+        free(fields_name_per_segment);
     }
     free_mram_image(mram_image);
     free_dpu_system(dpu_system);

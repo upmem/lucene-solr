@@ -21,6 +21,7 @@ bool load_segment_files(mram_image_t *mram_image,
                         const char* segment_suffix,
                         unsigned int *nb_field,
                         char ***field_names);
+void load_empty_segment(mram_image_t *mram_image, uint32_t segment_number);
 void free_mram_image(mram_image_t *mram_image);
 
 #endif //DPU_POC_SEGMENT_FILES_H

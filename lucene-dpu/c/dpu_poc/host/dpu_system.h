@@ -21,7 +21,7 @@ bool search(dpu_system_t *dpu_system,
             const char *field,
             const char *value,
             bool save_memory_image,
-            unsigned int *nb_field,
-            char ***field_names);
+            unsigned int nb_fields,
+            char **field_names);
 
 #endif //DPU_POC_DPU_SYSTEM_H
