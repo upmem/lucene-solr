@@ -7,6 +7,7 @@
 #include <perfcounter.h>
 #include <ktrace.h>
 #include <barrier.h>
+#include <alloc.h>
 
 #include "context.h"
 #include "search.h"
@@ -26,14 +27,15 @@ int main(void) {
     barrier_id_t barrier = BARRIER_GET(init_barrier);
 
     if (task_id == 0) {
+        mem_reset();
         init_idf_output();
         perfcounter_config(COUNT_CYCLES, true);
         query = fetch_query(true);
     }
 
-    context = initialize_flat_context(task_id);
-
     barrier_wait(barrier);
+
+    context = initialize_flat_context(task_id);
 
     if (context == NULL) {
         barrier_wait(barrier);
