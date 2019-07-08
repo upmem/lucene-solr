@@ -438,7 +438,7 @@ public final class DpuManager {
       resetMemoryImageContent();
 
       this.currentThreadId = 0;
-      this.currentImageOffset = 0;
+      this.currentImageOffset = SEGMENTS_OFFSET;
 
       if (this.currentDpuId == (this.description.nrOfDpusPerControlInterface - 1)) {
         this.currentDpuId = 0;
@@ -471,7 +471,7 @@ public final class DpuManager {
       long offset = 0xffffffffL | ((eachThread & 0xffffffffL) << 32);
       write(offset, this.memoryImage, offsetAddress);
     }
-    this.currentImageOffset = SEGMENT_SUMMARY_OFFSET + NR_THREADS * SEGMENT_SUMMARY_ENTRY_SIZE;
+    this.currentImageOffset = SEGMENTS_OFFSET;
 
     for (; this.currentDpuId < this.description.nrOfDpusPerControlInterface; this.currentDpuId++) {
       loadMemoryImage();
