@@ -435,6 +435,7 @@ public final class DpuManager {
 
     if (this.currentThreadId == NR_THREADS) {
       loadMemoryImage();
+      resetMemoryImageContent();
 
       this.currentThreadId = 0;
       this.currentImageOffset = 0;
@@ -454,10 +455,36 @@ public final class DpuManager {
     }
   }
 
-  public void finalizeIndexLoading() throws IOException {
+  private void finalizeIndexLoading() throws IOException {
     if (this.currentImageOffset != 0) {
+      for (int eachThread = this.currentThreadId; eachThread < NR_THREADS; eachThread++) {
+        int offsetAddress = SEGMENT_SUMMARY_OFFSET + eachThread * SEGMENT_SUMMARY_ENTRY_SIZE;
+        long offset = 0xffffffffL | ((eachThread & 0xffffffffL) << 32);
+        write(offset, this.memoryImage, offsetAddress);
+      }
+      loadMemoryImage();
+      resetMemoryImageContent();
+    }
+
+    for (int eachThread = 0; eachThread < NR_THREADS; eachThread++) {
+      int offsetAddress = SEGMENT_SUMMARY_OFFSET + eachThread * SEGMENT_SUMMARY_ENTRY_SIZE;
+      long offset = 0xffffffffL | ((eachThread & 0xffffffffL) << 32);
+      write(offset, this.memoryImage, offsetAddress);
+    }
+    this.currentImageOffset = SEGMENT_SUMMARY_OFFSET + NR_THREADS * SEGMENT_SUMMARY_ENTRY_SIZE;
+
+    for (; this.currentDpuId < this.description.nrOfDpusPerControlInterface; this.currentDpuId++) {
       loadMemoryImage();
     }
+
+    for (; this.currentCiId < this.description.nrOfControlInterfaces; this.currentCiId++) {
+      this.currentDpuId = 0;
+
+      for (; this.currentDpuId < this.description.nrOfDpusPerControlInterface; this.currentDpuId++) {
+        loadMemoryImage();
+      }
+    }
+
     this.indexLoaded = true;
   }
 
@@ -468,6 +495,12 @@ public final class DpuManager {
     this.ranks[this.currentRankId]
         .get(this.currentCiId, this.currentDpuId)
         .copyToMram(MEMORY_IMAGE_OFFSET, this.memoryImage, this.currentImageOffset);
+  }
+
+  private void resetMemoryImageContent() {
+    for (int eachByte = 0; eachByte < this.memoryImage.length; eachByte++) {
+      this.memoryImage[eachByte] = 0;
+    }
   }
 
   final static class DpuResults {
@@ -522,7 +555,6 @@ public final class DpuManager {
 
     write(fieldId, query, MAX_VALUE_SIZE);
 
-    //todo(UPMEM) only load used DPUs ?
     for (int eachCi = 0; eachCi < this.description.nrOfControlInterfaces; eachCi++) {
       for (int eachDpu = 0; eachDpu < this.description.nrOfDpusPerControlInterface; eachDpu++) {
         transfer.add(eachCi, eachDpu, QUERY_BUFFER_OFFSET, query);
@@ -538,7 +570,6 @@ public final class DpuManager {
     DpuResults results = new DpuResults();
     List<RawDpuResult> resultList = new ArrayList<>(this.description.nrOfControlInterfaces * this.description.nrOfControlInterfaces);
 
-    //todo(UPMEM) only boot used DPUs ?
     for (DpuRank rank : this.ranks) {
       rank.launch(SYSTEM_THREAD);
     }
