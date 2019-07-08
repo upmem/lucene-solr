@@ -1,8 +1,6 @@
 #include <dpu.h>
 #include <stdlib.h>
 #include <libgen.h>
-#include <dirent.h>
-#include <string.h>
 #include <dpu_characteristics.h>
 #include "segment_files.h"
 #include "dpu_system.h"
@@ -20,32 +18,22 @@
 #define DPU_PROFILE "cycleAccurate=true"
 
 int main(int argc, char **argv) {
-    if (argc != 2) {
-        fprintf(stderr, "usage: %s <index directory>\n", basename(argv[0]));
-        /* fprintf(stderr, "usage: %s <index directory> <segment number>\n", basename(argv[0])); */
+    if (argc != 4) {
+        fprintf(stderr, "usage: %s <index directory> <field name> <term search>\n", basename(argv[0]));
         return 1;
     }
 
     char *index_directory = argv[1];
-    /* uint32_t segment_number = (uint32_t) atoi(argv[2]); */
+    char *field = argv[2];
+    char *term = argv[3];
 
     char** segment_suffixes = NULL;
+    uint32_t nr_segments = discover_segments(index_directory, &segment_suffixes);
 
-    DIR* directory = opendir(index_directory);
-    struct dirent* file;
-    uint32_t current_segment_idx = 0;
-    while ((file = readdir(directory))) {
-        size_t len = strlen(file->d_name);
-        if ((len >= 3) && (strcmp(".si", file->d_name + len - 3) == 0)) {
-            segment_suffixes = realloc(segment_suffixes, (current_segment_idx + 1) * sizeof(*segment_suffixes));
-            segment_suffixes[current_segment_idx] = malloc(len - 3);
-            memcpy(segment_suffixes[current_segment_idx], file->d_name + 1, len - 4);
-            segment_suffixes[current_segment_idx][len - 4] = '\0';
-            current_segment_idx++;
-        }
+    if (nr_segments == -1) {
+        return 1;
     }
 
-    uint32_t nr_segments = current_segment_idx;
     uint32_t nr_dpus = (nr_segments / NR_THREADS) + (((nr_segments % NR_THREADS) == 0) ? 0 : 1);
     dpu_system_t *dpu_system = initialize_dpu_system(nr_dpus, DPU_BINARY_PATH, DPU_TYPE, DPU_PROFILE);
 

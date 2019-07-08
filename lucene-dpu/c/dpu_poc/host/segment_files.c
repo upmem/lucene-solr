@@ -9,6 +9,8 @@ typedef void mram_cache_t;
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <dirent.h>
+#include <string.h>
 #include "x86_process/lib.h"
 #include <search_context.h>
 #include <field_reader_struct.h>
@@ -36,6 +38,36 @@ void mram_image_reset(mram_image_t *mram_image) {
 void free_mram_image(mram_image_t *mram_image) {
     free(mram_image->content);
     free(mram_image);
+}
+
+uint32_t discover_segments(const char* index_directory, char ***segment_suffixes) {
+    DIR* directory = opendir(index_directory);
+
+    if (directory == NULL) {
+        fprintf(stderr, "cannot find index directory\n");
+        return -1;
+    }
+
+    struct dirent* file;
+    uint32_t current_segment_idx = 0;
+    while ((file = readdir(directory))) {
+        size_t len = strlen(file->d_name);
+        if ((len >= 3) && (strcmp(".si", file->d_name + len - 3) == 0)) {
+            *segment_suffixes = realloc(*segment_suffixes, (current_segment_idx + 1) * sizeof(**segment_suffixes));
+            (*segment_suffixes)[current_segment_idx] = malloc(len - 3);
+            memcpy((*segment_suffixes)[current_segment_idx], file->d_name + 1, len - 4);
+            (*segment_suffixes)[current_segment_idx][len - 4] = '\0';
+            current_segment_idx++;
+        }
+    }
+
+    return current_segment_idx;
+}
+
+void load_empty_segment(mram_image_t *mram_image, uint32_t segment_number) {
+    uint32_t offset_address = SEGMENT_SUMMARY_OFFSET + mram_image->nr_segments * SEGMENT_SUMMARY_ENTRY_SIZE;
+    *((uint64_t *)(mram_image->content + offset_address)) = 0xffffffffl | (((uint64_t) segment_number) << 32);
+    mram_image->nr_segments++;
 }
 
 bool load_segment_files(mram_image_t *mram_image,
