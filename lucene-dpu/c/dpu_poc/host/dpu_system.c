@@ -34,8 +34,7 @@ dpu_system_t* initialize_dpu_system(unsigned int nr_dpus, const char* dpu_binary
             .logging_config = &log
     };
 
-    unsigned int ignored;
-    if (dpu_alloc_dpus(&params, nr_dpus, &dpu_system->ranks, &dpu_system->nr_ranks, &ignored) != DPU_API_SUCCESS) {
+    if (dpu_alloc_dpus(&params, nr_dpus, &dpu_system->ranks, &dpu_system->nr_ranks, &dpu_system->nr_dpus) != DPU_API_SUCCESS) {
         fprintf(stderr, "cannot allocate rank\n");
         free(dpu_system);
         return NULL;

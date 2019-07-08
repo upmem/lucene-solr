@@ -11,6 +11,7 @@
 
 typedef struct {
     unsigned int nr_ranks;
+    unsigned int nr_dpus;
     struct dpu_rank_t **ranks;
 } dpu_system_t;
 

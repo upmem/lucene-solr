@@ -84,6 +84,18 @@ int main(int argc, char **argv) {
         mram_image_reset(mram_image);
     }
 
+    for (each_thread = 0; each_thread < NR_THREADS; each_thread++) {
+        load_empty_segment(mram_image, each_thread);
+    }
+
+    for (each_dpu = nr_dpus; each_dpu < dpu_system->nr_dpus; ++each_dpu) {
+        if (!prepare_mram_with_segments(dpu_system, each_dpu, mram_image)) {
+            free_mram_image(mram_image);
+            free_dpu_system(dpu_system);
+            return 5;
+        }
+    }
+
     search(dpu_system, field, term, true, nb_fields_per_segment, fields_name_per_segment);
 //    search(dpu_system, "contents", "stupid", true, nb_fields_per_segment, fields_name_per_segment);
 //    search(dpu_system, "contents", "license", true, nb_fields_per_segment, fields_name_per_segment);
