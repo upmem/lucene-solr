@@ -167,6 +167,8 @@ public final class DpuManager {
 
   private final Map<DpuRank, int[][][]> docBases;
 
+  private final Map<Integer, Map<BytesRef, DpuResults>> cachedResults;
+
   private int currentRankId;
   private int currentCiId;
   private int currentDpuId;
@@ -198,6 +200,7 @@ public final class DpuManager {
     }
 
     this.docBases = new HashMap<>();
+    this.cachedResults = new HashMap<>();
 
     this.memoryImage = new byte[this.description.mramSizeInBytes];
     this.currentImageOffset = SEGMENTS_OFFSET;
@@ -539,10 +542,18 @@ public final class DpuManager {
     if (!this.indexLoaded) {
       finalizeIndexLoading();
     }
+    Map<BytesRef, DpuResults> resultsForTarget = this.cachedResults.computeIfAbsent(fieldId, k -> new HashMap<>());
 
-    fieldId = this.fieldIdMapping.get(fieldId);
-    loadQuery(fieldId, target);
-    return doSearch();
+    DpuResults results = resultsForTarget.get(target);
+
+    if (results == null) {
+      fieldId = this.fieldIdMapping.get(fieldId);
+      loadQuery(fieldId, target);
+      results = doSearch();
+      resultsForTarget.put(target, results);
+    }
+
+    return results;
   }
 
   private void loadQuery(int fieldId, BytesRef target) {
