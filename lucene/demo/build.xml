@@ -37,8 +37,6 @@
    <pathelement path="${facet.jar}"/>
    <pathelement path="${expressions.jar}"/>
    <fileset dir="../expressions/lib"/>
-    <!-- UPMEM todo remove when TestDemo is not done on DPUs -->
-   <fileset dir="../core/lib"/>
   </path>
 
   <target name="javadocs" depends="javadocs-analyzers-common,javadocs-queryparser,javadocs-facet,javadocs-expressions,compile-core,check-javadocs-uptodate"

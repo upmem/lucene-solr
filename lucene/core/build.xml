@@ -49,8 +49,6 @@
     <pathelement location="${-test.classpath.java9.addon}"/><!-- if it's a duplicate it gets removed by Ant! -->
     <pathelement location="${build.dir}/classes/java"/>
     <pathelement location="${build.dir}/classes/test"/>
-    <!-- UPMEM -->
-    <fileset dir="lib"/>
   </path>
 
   <path id="junit.classpath">
