@@ -40,14 +40,11 @@ import static org.apache.lucene.codecs.lucene80.Lucene80NormsFormat.VERSION_STAR
 /**
  * Reader for {@link Lucene80NormsFormat}
  */
-// UPMEM change: package -> public
-public final class Lucene80NormsProducer extends NormsProducer implements Cloneable {
+final class Lucene80NormsProducer extends NormsProducer implements Cloneable {
   // metadata maps (just file pointers and minimal stuff)
-  // UPMEM change: private -> public
-  public final Map<Integer,NormsEntry> norms = new HashMap<>();
+  private final Map<Integer,NormsEntry> norms = new HashMap<>();
   private final int maxDoc;
-  // UPMEM change: private -> public
-  public IndexInput data;
+  private IndexInput data;
   private boolean merging;
   private Map<Integer, IndexInput> disiInputs;
   private Map<Integer, RandomAccessInput> disiJumpTables;
@@ -111,22 +108,14 @@ public final class Lucene80NormsProducer extends NormsProducer implements Clonea
     return clone;
   }
 
-  // UPMEM change: package -> public
-  public static class NormsEntry {
-    // UPMEM change: package -> public
-    public byte denseRankPower;
-    // UPMEM change: package -> public
-    public byte bytesPerNorm;
-    // UPMEM change: package -> public
-    public long docsWithFieldOffset;
-    // UPMEM change: package -> public
-    public long docsWithFieldLength;
-    // UPMEM change: package -> public
-    public short jumpTableEntryCount;
-    // UPMEM change: package -> public
-    public int numDocsWithField;
-    // UPMEM change: package -> public
-    public long normsOffset;
+  static class NormsEntry {
+    byte denseRankPower;
+    byte bytesPerNorm;
+    long docsWithFieldOffset;
+    long docsWithFieldLength;
+    short jumpTableEntryCount;
+    int numDocsWithField;
+    long normsOffset;
   }
 
   static abstract class DenseNormsIterator extends NumericDocValues {

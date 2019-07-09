@@ -35,9 +35,7 @@ import org.apache.lucene.codecs.NormsProducer;
 import org.apache.lucene.codecs.PostingsFormat;
 import org.apache.lucene.codecs.PostingsReaderBase;
 import org.apache.lucene.codecs.StoredFieldsReader;
-import org.apache.lucene.codecs.lucene50.ForUtil;
 import org.apache.lucene.codecs.lucene50.Lucene50PostingsReader;
-import org.apache.lucene.codecs.lucene80.Lucene80NormsProducer;
 import org.apache.lucene.index.BinaryDocValues;
 import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.index.FieldInfo;
@@ -57,16 +55,13 @@ import org.apache.lucene.index.SortedNumericDocValues;
 import org.apache.lucene.index.SortedSetDocValues;
 import org.apache.lucene.index.StoredFieldVisitor;
 import org.apache.lucene.index.Terms;
+import org.apache.lucene.store.ChecksumIndexInput;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.IOUtils;
-
-import static org.apache.lucene.codecs.blocktree.BlockTreeTermsReader.VERSION_AUTO_PREFIX_TERMS_REMOVED;
-import static org.apache.lucene.codecs.blocktree.BlockTreeTermsReader.VERSION_CURRENT;
-import static org.apache.lucene.codecs.blocktree.BlockTreeTermsReader.VERSION_START;
 
 public final class DpuIndexReader extends LeafReader {
   private final Directory directory;
@@ -77,9 +72,16 @@ public final class DpuIndexReader extends LeafReader {
   private final TreeMap<String, List<NumericDocValues>> norms;
   private final List<Integer> docBases;
 
+  private IndexInput data;
+
   private final int numDocs;
   private final int maxDoc;
   private final List<StoredFieldsReader> storedFieldsReaders;
+
+  private static final String DATA_CODEC = "Lucene80NormsData";
+  private static final String DATA_EXTENSION = "nvd";
+  private static final String METADATA_CODEC = "Lucene80NormsMetadata";
+  private static final String METADATA_EXTENSION = "nvm";
 
   public DpuIndexReader(Directory directory, SegmentInfos sis) throws DpuException, IOException {
     this.directory = directory;
@@ -112,7 +114,8 @@ public final class DpuIndexReader extends LeafReader {
 
       this.storedFieldsReaders.add(si.info.getCodec().storedFieldsFormat().fieldsReader(dir, si.info, fieldInfos, IOContext.DEFAULT));
 
-      Lucene80NormsProducer normsProducer = (Lucene80NormsProducer) si.info.getCodec().normsFormat().normsProducer(segmentReadState);
+      Map<Integer, NormsEntry> normEntries = normProducer(segmentReadState, DATA_CODEC, DATA_EXTENSION, METADATA_CODEC, METADATA_EXTENSION);
+      NormsProducer normsProducer = si.info.getCodec().normsFormat().normsProducer(segmentReadState);
 
       SegmentReadState lucene50State = new SegmentReadState(segmentReadState, "Lucene50_0");
       Lucene50PostingsReader postingsReader = new Lucene50PostingsReader(lucene50State);
@@ -121,7 +124,7 @@ public final class DpuIndexReader extends LeafReader {
       IndexInput termsIn = fetchFieldReaders(postingsReader, lucene50State, fieldReaders);
 
       this.dpuManager.loadSegment(segmentNumber, maxDoc, fieldInfos, fieldReaders, postingsReader.forUtil, termsIn,
-          postingsReader.docIn, normsProducer.data, normsProducer.norms);
+          postingsReader.docIn, this.data, normEntries);
 
       for (FieldInfo fieldInfo : fieldInfos) {
         String fieldName = fieldInfo.name;
@@ -134,7 +137,7 @@ public final class DpuIndexReader extends LeafReader {
               terms.hasFreqs(), terms.hasOffsets(), terms.hasPositions(), terms.hasPayloads());
         }
 
-        if (normsProducer.norms.get(fieldInfo.number) != null) {
+        if (normEntries.get(fieldInfo.number) != null) {
           NumericDocValues norms = normsProducer.getNorms(fieldInfo);
 
           List<NumericDocValues> storedNorms = this.norms.computeIfAbsent(fieldName, k -> new ArrayList<>());
@@ -401,6 +404,10 @@ public final class DpuIndexReader extends LeafReader {
     return hi;
   }
 
+  private static final int TERMS_VERSION_START = 2;
+  private static final int TERMS_VERSION_AUTO_PREFIX_TERMS_REMOVED = 3;
+  private static final int TERMS_VERSION_CURRENT = TERMS_VERSION_AUTO_PREFIX_TERMS_REMOVED;
+
   private IndexInput fetchFieldReaders(PostingsReaderBase postingsReader, SegmentReadState state, Map<Integer, DpuFieldReader> fields) throws IOException {
     // This is almost a copy of the BlockTreeTermsReader constructor function
     boolean success = false;
@@ -412,9 +419,9 @@ public final class DpuIndexReader extends LeafReader {
     IndexInput termsIn;
     try {
       termsIn = state.directory.openInput(termsName, state.context);
-      int version = CodecUtil.checkIndexHeader(termsIn, TERMS_CODEC_NAME, VERSION_START, VERSION_CURRENT, state.segmentInfo.getId(), state.segmentSuffix);
+      int version = CodecUtil.checkIndexHeader(termsIn, TERMS_CODEC_NAME, TERMS_VERSION_START, TERMS_VERSION_CURRENT, state.segmentInfo.getId(), state.segmentSuffix);
 
-      if (version < VERSION_AUTO_PREFIX_TERMS_REMOVED) {
+      if (version < TERMS_VERSION_AUTO_PREFIX_TERMS_REMOVED) {
         // pre-6.2 index, records whether auto-prefix terms are enabled in the header
         byte b = termsIn.readByte();
         if (b != 0) {
@@ -514,5 +521,92 @@ public final class DpuIndexReader extends LeafReader {
     input.seek(input.length() - CodecUtil.footerLength() - 8);
     long offset = input.readLong();
     input.seek(offset);
+  }
+
+  private static final int NORMS_VERSION_START = 0;
+  private static final int NORMS_VERSION_CURRENT = NORMS_VERSION_START;
+
+  private Map<Integer, NormsEntry> normProducer(SegmentReadState state, String dataCodec, String dataExtension, String metaCodec, String metaExtension) throws IOException {
+    // This is almost a copy of the Lucene80NormsProducer constructor function
+    String metaName = IndexFileNames.segmentFileName(state.segmentInfo.name, state.segmentSuffix, metaExtension);
+    int version = -1;
+    Map<Integer, NormsEntry> normsEntries = null;
+
+    // read in the entries from the metadata file.
+    try (ChecksumIndexInput in = state.directory.openChecksumInput(metaName, state.context)) {
+      Throwable priorE = null;
+      try {
+        version = CodecUtil.checkIndexHeader(in, metaCodec, NORMS_VERSION_START, NORMS_VERSION_CURRENT, state.segmentInfo.getId(), state.segmentSuffix);
+        normsEntries = readFields(in, state.fieldInfos);
+      } catch (Throwable exception) {
+        priorE = exception;
+      } finally {
+        CodecUtil.checkFooter(in, priorE);
+      }
+    }
+
+    String dataName = IndexFileNames.segmentFileName(state.segmentInfo.name, state.segmentSuffix, dataExtension);
+    data = state.directory.openInput(dataName, state.context);
+    boolean success = false;
+    try {
+      final int version2 = CodecUtil.checkIndexHeader(data, dataCodec, NORMS_VERSION_START, NORMS_VERSION_CURRENT, state.segmentInfo.getId(), state.segmentSuffix);
+      if (version != version2) {
+        throw new CorruptIndexException("Format versions mismatch: meta=" + version + ",data=" + version2, data);
+      }
+
+      // NOTE: data file is too costly to verify checksum against all the bytes on open,
+      // but for now we at least verify proper structure of the checksum footer: which looks
+      // for FOOTER_MAGIC + algorithmID. This is cheap and can detect some forms of corruption
+      // such as file truncation.
+      CodecUtil.retrieveChecksum(data);
+
+      success = true;
+    } finally {
+      if (!success) {
+        IOUtils.closeWhileHandlingException(this.data);
+      }
+    }
+
+    return normsEntries;
+  }
+
+  static class NormsEntry {
+    byte denseRankPower;
+    byte bytesPerNorm;
+    long docsWithFieldOffset;
+    long docsWithFieldLength;
+    short jumpTableEntryCount;
+    int numDocsWithField;
+    long normsOffset;
+  }
+
+  private Map<Integer, NormsEntry> readFields(IndexInput meta, FieldInfos infos) throws IOException {
+    Map<Integer, NormsEntry> norms = new HashMap<>();
+
+    for (int fieldNumber = meta.readInt(); fieldNumber != -1; fieldNumber = meta.readInt()) {
+      FieldInfo info = infos.fieldInfo(fieldNumber);
+      if (info == null) {
+        throw new CorruptIndexException("Invalid field number: " + fieldNumber, meta);
+      } else if (!info.hasNorms()) {
+        throw new CorruptIndexException("Invalid field: " + info.name, meta);
+      }
+      NormsEntry entry = new NormsEntry();
+      entry.docsWithFieldOffset = meta.readLong();
+      entry.docsWithFieldLength = meta.readLong();
+      entry.jumpTableEntryCount = meta.readShort();
+      entry.denseRankPower = meta.readByte();
+      entry.numDocsWithField = meta.readInt();
+      entry.bytesPerNorm = meta.readByte();
+      switch (entry.bytesPerNorm) {
+        case 0: case 1: case 2: case 4: case 8:
+          break;
+        default:
+          throw new CorruptIndexException("Invalid bytesPerValue: " + entry.bytesPerNorm + ", field: " + info.name, meta);
+      }
+      entry.normsOffset = meta.readLong();
+      norms.put(info.number, entry);
+    }
+
+    return norms;
   }
 }

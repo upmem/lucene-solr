@@ -47,7 +47,6 @@ import com.upmem.dpujni.DpuDescription;
 import com.upmem.dpujni.DpuMramTransfer;
 import com.upmem.properties.DpuType;
 import org.apache.lucene.codecs.lucene50.ForUtil;
-import org.apache.lucene.codecs.lucene80.Lucene80NormsProducer;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.IndexOptions;
@@ -212,7 +211,7 @@ public final class DpuManager {
 
   public void loadSegment(int segmentNumber, int docBase, FieldInfos fieldInfos, Map<Integer, DpuFieldReader> fieldReaders,
                           ForUtil forUtil, IndexInput termsIn, IndexInput docIn, IndexInput normsData,
-                          Map<Integer, Lucene80NormsProducer.NormsEntry> norms) throws IOException {
+                          Map<Integer, DpuIndexReader.NormsEntry> norms) throws IOException {
     assert this.currentRankId < this.ranks.length : "UPMEM too many segments for the number of allocated DPUs";
 
     int[][][] rankDocBases = this.docBases.computeIfAbsent(this.ranks[this.currentRankId], k ->
@@ -274,7 +273,7 @@ public final class DpuManager {
     write(forUtil.iterations, this.memoryImage, searchContextOffset + DPU_CONTEXT_FOR_UTIL_OFFSET + DPU_FOR_UTIL_ITERATIONS_OFFSET);
     this.currentImageOffset = DMA_ALIGNED(this.currentImageOffset + DPU_CONTEXT_LENGTH);
     for (int eachFieldId = 0; eachFieldId < maxFieldId + 1; eachFieldId++) {
-      Lucene80NormsProducer.NormsEntry normsEntry = norms.get(eachFieldId);
+      DpuIndexReader.NormsEntry normsEntry = norms.get(eachFieldId);
 
       if (normsEntry != null) {
         write(normsEntry.docsWithFieldOffset, this.memoryImage, this.currentImageOffset + DPU_NORMS_ENTRY_DOCS_WITH_FIELD_OFFSET_OFFSET);
