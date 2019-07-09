@@ -38,6 +38,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import com.upmem.dpu.host.api.DpuException;
 import com.upmem.dpu.host.api.DpuProgram;
@@ -510,7 +511,7 @@ public final class DpuManager {
     int docFreq = 0;
     long totalTermFreq = 0;
 
-    java.util.PriorityQueue<DpuDocResult> results = new java.util.PriorityQueue<>(Comparator.comparingInt(o -> o.docId));
+    TreeSet<DpuDocResult> results = new TreeSet<>(Comparator.comparingInt(o -> o.docId));
   }
 
   final static class DpuDocResult {
