@@ -37,8 +37,6 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
-// UPMEM
-import org.apache.lucene.dpu.FixedSizeMergePolicy;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -103,9 +101,6 @@ public class IndexFiles {
         // Add new documents to an existing index:
         iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
       }
-      // UPMEM
-      iwc.setRAMBufferSizeMB(0.1);
-      iwc.setMergePolicy(new FixedSizeMergePolicy(4));
 
       // Optional: for better indexing performance, if you
       // are indexing many documents, increase the RAM
@@ -124,9 +119,6 @@ public class IndexFiles {
       // you're done adding documents to it):
       //
       // writer.forceMerge(1);
-
-      //UPMEM
-      writer.forceMerge(2048);
 
       writer.close();
 

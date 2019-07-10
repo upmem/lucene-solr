@@ -66,7 +66,12 @@ grant {
   permission java.lang.RuntimePermission "accessClassInPackage.org.apache.xerces.util";
   // needed by jacoco to dump coverage
   permission java.lang.RuntimePermission "shutdownHooks";
-  
+
+  // UPMEM
+  permission java.lang.RuntimePermission "getenv.*";
+  permission java.lang.RuntimePermission "loadLibrary.dpujni-2019.*";
+  permission java.io.FilePermission "<<ALL FILES>>", "read";
+
   // read access to all system properties:
   permission java.util.PropertyPermission "*", "read";
   // write access to only these:

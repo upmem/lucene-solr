@@ -28,7 +28,6 @@ import java.nio.IntBuffer;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -458,7 +457,7 @@ public final class DpuManager {
     }
   }
 
-  private void finalizeIndexLoading() throws IOException {
+  private void finalizeIndexLoading() {
     if (this.currentThreadId != 0) {
       for (int eachThread = this.currentThreadId; eachThread < NR_THREADS; eachThread++) {
         int offsetAddress = SEGMENT_SUMMARY_OFFSET + eachThread * SEGMENT_SUMMARY_ENTRY_SIZE;
@@ -508,10 +507,7 @@ public final class DpuManager {
     this.indexLoaded = true;
   }
 
-  private void loadMemoryImage() throws IOException {
-    Files.write(Paths.get("mram_" + this.currentRankId + "_" + this.currentCiId + "_" + this.currentDpuId + ".bin"),
-        this.memoryImage);
-
+  private void loadMemoryImage() {
     this.ranks[this.currentRankId]
         .get(this.currentCiId, this.currentDpuId)
         .copyToMram(MEMORY_IMAGE_OFFSET, this.memoryImage, this.currentImageOffset);
@@ -555,7 +551,7 @@ public final class DpuManager {
     }
   }
 
-  public DpuResults search(int fieldId, BytesRef target) throws IOException {
+  public DpuResults search(int fieldId, BytesRef target) {
     if (!this.indexLoaded) {
       finalizeIndexLoading();
     }
