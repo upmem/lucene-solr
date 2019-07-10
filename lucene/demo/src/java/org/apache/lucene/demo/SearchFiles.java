@@ -28,7 +28,6 @@ import java.util.Date;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.dpu.DpuIndexReader;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.queryparser.classic.QueryParser;
@@ -87,9 +86,7 @@ public class SearchFiles {
         i++;
       }
     }
-//    UPMEM
-//    IndexReader reader = DirectoryReader.open(FSDirectory.open(Paths.get(index)));
-    IndexReader reader = DpuIndexReader.open(FSDirectory.open(Paths.get(index)));
+    IndexReader reader = DirectoryReader.open(FSDirectory.open(Paths.get(index)));
     IndexSearcher searcher = new IndexSearcher(reader);
     Analyzer analyzer = new StandardAnalyzer();
 
