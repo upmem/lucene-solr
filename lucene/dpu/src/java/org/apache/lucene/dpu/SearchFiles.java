@@ -57,6 +57,7 @@ public class SearchFiles {
     boolean raw = false;
     String queryString = null;
     int hitsPerPage = 10;
+    DpuConfiguration configuration = DpuConfiguration.forSimulator();
     
     for(int i = 0;i < args.length;i++) {
       if ("-index".equals(args[i])) {
@@ -83,9 +84,18 @@ public class SearchFiles {
           System.exit(1);
         }
         i++;
+      } else if ("-target".equals(args[i])) {
+        if ("simulator".equals(args[i + 1])) {
+          configuration = DpuConfiguration.forSimulator();
+        } else if ("hw".equals(args[i + 1])) {
+          configuration = DpuConfiguration.forHardware();
+        } else {
+          System.err.println("Unknown DPU target '" + args[i + 1] + "'.");
+          System.exit(1);
+        }
       }
     }
-    IndexReader reader = DpuIndexReader.open(FSDirectory.open(Paths.get(index)));
+    IndexReader reader = DpuIndexReader.open(FSDirectory.open(Paths.get(index)), configuration);
     IndexSearcher searcher = new IndexSearcher(reader);
     Analyzer analyzer = new StandardAnalyzer();
 

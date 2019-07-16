@@ -55,8 +55,6 @@ import org.apache.lucene.util.packed.BulkOperationPacked;
 import org.apache.lucene.util.packed.PackedInts;
 
 public final class DpuManager {
-  private static final DpuType DEFAULT_DPU_TYPE = DpuType.simulator;
-  private static final String DEFAULT_DPU_PROFILE = "enableDbgLib=true";
   private static final String DPU_SEARCH_PROGRAM = "org/apache/lucene/dpu/term_search.dpu";
   private static final int SYSTEM_THREAD = 0;
   private static final int NR_THREADS = 10;
@@ -177,10 +175,6 @@ public final class DpuManager {
   private boolean indexLoaded;
 
   private final Map<Integer, Integer> fieldIdMapping;
-
-  public DpuManager(int nrOfSegments) throws DpuException, IOException {
-    this(nrOfSegments, DEFAULT_DPU_TYPE, DEFAULT_DPU_PROFILE);
-  }
 
   public DpuManager(int nrOfSegments, DpuType type, String profile) throws DpuException, IOException {
     int nrOfDpus = (nrOfSegments / NR_THREADS) + (((nrOfSegments % NR_THREADS) == 0) ? 0 : 1);
