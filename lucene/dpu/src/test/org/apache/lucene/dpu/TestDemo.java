@@ -38,6 +38,8 @@ import org.junit.rules.TestRule;
 import static org.junit.Assert.assertTrue;
 
 public class TestDemo {
+  private static final String dpuTarget = System.getenv("UPMEM_DPU_TARGET");
+
   private Path javaTempDir;
 
   @Rule
@@ -63,12 +65,22 @@ public class TestDemo {
   };
 
   private void testOneSearch(Path indexPath, String query, int expectedHitCount) throws Exception {
+    String target;
+
+    if (dpuTarget == null) {
+      target = "fsim";
+    } else if ("fpga".equals(dpuTarget)) {
+      target = "hw";
+    } else {
+      target = dpuTarget;
+    }
+
     PrintStream outSave = System.out;
     try {
       ByteArrayOutputStream bytes = new ByteArrayOutputStream();
       PrintStream fakeSystemOut = new PrintStream(bytes, false, Charset.defaultCharset().name());
       System.setOut(fakeSystemOut);
-      SearchFiles.main(new String[] {"-query", query, "-index", indexPath.toString()});
+      SearchFiles.main(new String[] {"-query", query, "-index", indexPath.toString(), "-target", target});
       fakeSystemOut.flush();
       String output = bytes.toString(Charset.defaultCharset().name()); // intentionally use default encoding
       assertTrue("output=" + output, output.contains(expectedHitCount + " total matching documents"));
