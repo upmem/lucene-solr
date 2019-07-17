@@ -366,7 +366,7 @@ public final class DpuIndexReader extends LeafReader {
 
   @Override
   protected void doClose() throws IOException {
-
+    this.dpuManager.close();
   }
 
   @Override

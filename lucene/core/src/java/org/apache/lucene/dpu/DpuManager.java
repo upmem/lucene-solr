@@ -20,6 +20,7 @@
  */
 package org.apache.lucene.dpu;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -54,7 +55,7 @@ import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.packed.BulkOperationPacked;
 import org.apache.lucene.util.packed.PackedInts;
 
-public final class DpuManager {
+public final class DpuManager implements Closeable {
   private static final String DPU_SEARCH_PROGRAM = "org/apache/lucene/dpu/term_search.dpu";
   private static final int SYSTEM_THREAD = 0;
   private static final int NR_THREADS = 10;
@@ -515,6 +516,13 @@ public final class DpuManager {
   private void resetMemoryImageContent() {
     for (int eachByte = 0; eachByte < this.memoryImage.length; eachByte++) {
       this.memoryImage[eachByte] = 0;
+    }
+  }
+
+  @Override
+  public void close() throws IOException {
+    for (DpuRank rank : this.ranks) {
+      rank.close();
     }
   }
 
