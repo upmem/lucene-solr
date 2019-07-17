@@ -34,6 +34,17 @@
     <fileset dir="lib"/>
   </path>
 
+  <!-- UPMEM -->
+  <target name="compile-dpu">
+    <property name="dpu.src.dir" value="src/c/dpu"/>
+    <property name="dpu.build.dir" value="${build.dir}/dpu/org/apache/lucene/dpu"/>
+
+    <mkdir dir="${dpu.build.dir}"/>
+    <exec executable="make" failonerror="true">
+      <arg line="-f ${dpu.src.dir}/Makefile BUILDDIR=${dpu.build.dir}"/>
+    </exec>
+  </target>
+
   <!-- if we run with Java 9+, we refer to the java9 classes directory and insert this before the main classpath (to "emulate" a MR-JAR): -->
   <condition property="-test.classpath.java9.addon" value="${build.dir}/classes/java9" else="${build.dir}/classes/java">
     <and>
