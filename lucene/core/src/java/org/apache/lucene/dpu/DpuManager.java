@@ -786,6 +786,11 @@ public final class DpuManager implements Closeable {
   private synchronized static String fetchDpuSearchProgram() throws IOException {
     if (dpuSearchProgramInstance == null) {
       InputStream is = getResourceAsStream(DPU_SEARCH_PROGRAM);
+
+      if (is == null) {
+        throw new IOException("cannot find DPU search program");
+      }
+
       Path path = Files.createTempFile("term_search", ".dpu");
       Files.copy(is, path, StandardCopyOption.REPLACE_EXISTING);
       path.toFile().deleteOnExit();
