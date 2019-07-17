@@ -37,7 +37,7 @@
   <!-- UPMEM -->
   <target name="compile-dpu">
     <property name="dpu.src.dir" value="src/c/dpu"/>
-    <property name="dpu.build.dir" value="${build.dir}/dpu/org/apache/lucene/dpu"/>
+    <property name="dpu.build.dir" value="${build.dir}/classes/java/org/apache/lucene/dpu"/>
 
     <mkdir dir="${dpu.build.dir}"/>
     <exec executable="make" failonerror="true">
