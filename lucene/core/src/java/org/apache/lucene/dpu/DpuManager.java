@@ -494,6 +494,7 @@ public final class DpuManager implements Closeable {
       for (; this.currentDpuId < this.description.nrOfDpusPerControlInterface; this.currentDpuId++) {
         loadMemoryImage();
       }
+      this.currentCiId++;
 
       for (; this.currentCiId < this.description.nrOfControlInterfaces; this.currentCiId++) {
         this.currentDpuId = 0;
