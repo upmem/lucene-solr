@@ -551,7 +551,16 @@
     </sequential>
   </macrodef>
 
-  <target name="compile-core" depends="init, clover"
+  <!-- UPMEM -->
+  <target name="compile-dpu" unless="dpu.compiled">
+    <ant dir="${common.dir}/core" target="compile-dpu" inheritAll="false">
+      <propertyset refid="uptodate.and.compiled.properties"/>
+    </ant>
+    <property name="dpu.compiled" value="true"/>
+  </target>
+
+  <!-- UPMEM -->
+  <target name="compile-core" depends="init, clover, compile-dpu"
           description="Compiles core classes">
     <compile
       srcdir="${src.dir}"
@@ -822,6 +831,11 @@
   <target name="check-lucene-core-uptodate" unless="lucene-core.uptodate">
     <uptodate property="lucene-core.uptodate" targetfile="${lucene-core.jar}">
        <srcfiles dir="${common.dir}/core/src/java" includes="**/*.java"/>
+       <!-- UPMEM -->
+       <srcfiles dir="${common.dir}/core/src/c">
+         <include name="**/*.c"/>
+         <include name="**/*.h"/>
+       </srcfiles>
     </uptodate>
   </target>
   <target name="jar-lucene-core" unless="lucene-core.uptodate" depends="check-lucene-core-uptodate">
