@@ -180,6 +180,11 @@ public final class DpuManager {
     int nrOfDpus = (nrOfSegments / NR_THREADS) + (((nrOfSegments % NR_THREADS) == 0) ? 0 : 1);
     this.description = DpuRank.getDescription(type, profile);
     int nrOfDpusPerRank = this.description.nrOfControlInterfaces * this.description.nrOfDpusPerControlInterface;
+
+    if (nrOfDpusPerRank ==  0) {
+      throw new IOException("no DPU available for the configuration " + type.toString() + "/" + profile);
+    }
+
     int nrOfRanks = (nrOfDpus / nrOfDpusPerRank) + (((nrOfDpus % nrOfDpusPerRank) == 0) ? 0 : 1);
 
     this.ranks = new DpuRank[nrOfRanks];
