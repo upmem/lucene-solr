@@ -52,7 +52,7 @@ public class TestDemo {
 
       fileSystem = FileSystems.getDefault().provider().getFileSystem(URI.create("file:///"));
 
-      Path tmpDir = fileSystem.getPath(System.getProperty("tempDir", System.getProperty("java.io.tmpdir")));
+      Path tmpDir = fileSystem.getPath(System.getProperty("tempDir", System.getProperty("java.io.tmpdir")), "DpuDemo");
       Files.createDirectories(tmpDir);
 
       javaTempDir = tmpDir.toRealPath();
