@@ -40,7 +40,6 @@ int main(void) {
     if (context == NULL) {
         barrier_wait(barrier);
 
-        accumulate_idf_output(0, 0, 0);
         no_search();
     } else {
         if (task_id != 0) {

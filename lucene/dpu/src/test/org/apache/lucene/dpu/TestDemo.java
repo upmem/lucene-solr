@@ -31,6 +31,7 @@ import java.util.List;
 
 import com.carrotsearch.randomizedtesting.rules.TestRuleAdapter;
 import org.apache.lucene.util.IOUtils;
+import org.junit.Assume;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestRule;
@@ -39,6 +40,7 @@ import static org.junit.Assert.assertTrue;
 
 public class TestDemo {
   private static final String dpuTarget = System.getenv("UPMEM_DPU_TARGET");
+  private static final String wikipediaDatasetDirectoryName = System.getenv("UPMEM_DPU_DATASET");
 
   private Path javaTempDir;
 
@@ -100,6 +102,20 @@ public class TestDemo {
     testOneSearch(indexDir, "gnu", 6);
     testOneSearch(indexDir, "derivative", 8);
     testOneSearch(indexDir, "license", 13);
+  }
+
+  @Test
+  public void testBiggerIndexSearch() throws Exception {
+    Assume.assumeNotNull(wikipediaDatasetDirectoryName);
+    Path largerDatasetPath = Paths.get(wikipediaDatasetDirectoryName);
+    Path indexDir = javaTempDir;
+    IndexFiles.main(new String[] { "-create", "-docs", largerDatasetPath.toAbsolutePath().toString(), "-index", indexDir.toString()});
+    testOneSearch(indexDir, "apache", 219);
+    testOneSearch(indexDir, "patent", 1231);
+    testOneSearch(indexDir, "lucene", 4);
+    testOneSearch(indexDir, "gnu", 359);
+    testOneSearch(indexDir, "derivative", 797);
+    testOneSearch(indexDir, "license", 1330);
   }
 
   private Path getDataPath(String name) throws IOException {

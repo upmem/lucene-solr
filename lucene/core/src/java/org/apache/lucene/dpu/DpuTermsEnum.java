@@ -21,13 +21,16 @@
 package org.apache.lucene.dpu;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.lucene.index.Impact;
 import org.apache.lucene.index.Impacts;
 import org.apache.lucene.index.ImpactsEnum;
 import org.apache.lucene.index.PostingsEnum;
 import org.apache.lucene.index.TermsEnum;
+import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.util.BytesRef;
 
 public final class DpuTermsEnum extends TermsEnum {
@@ -70,6 +73,27 @@ public final class DpuTermsEnum extends TermsEnum {
     throw new RuntimeException("UPMEM not implemented");
   }
 
+  private static final Impacts DUMMY_IMPACTS = new Impacts() {
+
+    private final List<Impact> impacts = Collections.singletonList(new Impact(Integer.MAX_VALUE, 1L));
+
+    @Override
+    public int numLevels() {
+      return 1;
+    }
+
+    @Override
+    public int getDocIdUpTo(int level) {
+      return DocIdSetIterator.NO_MORE_DOCS;
+    }
+
+    @Override
+    public List<Impact> getImpacts(int level) {
+      return impacts;
+    }
+
+  };
+
   @Override
   public ImpactsEnum impacts(int flags) throws IOException {
     if (PostingsEnum.featureRequested(flags, PostingsEnum.POSITIONS)) {
@@ -84,12 +108,12 @@ public final class DpuTermsEnum extends TermsEnum {
 
       @Override
       public void advanceShallow(int target) throws IOException {
-        throw new RuntimeException("UPMEM not implemented");
+
       }
 
       @Override
       public Impacts getImpacts() throws IOException {
-        throw new RuntimeException("UPMEM not implemented");
+        return DUMMY_IMPACTS;
       }
 
       @Override
@@ -99,22 +123,22 @@ public final class DpuTermsEnum extends TermsEnum {
 
       @Override
       public int nextPosition() throws IOException {
-        throw new RuntimeException("UPMEM not implemented");
+        return -1;
       }
 
       @Override
       public int startOffset() throws IOException {
-        throw new RuntimeException("UPMEM not implemented");
+        return -1;
       }
 
       @Override
       public int endOffset() throws IOException {
-        throw new RuntimeException("UPMEM not implemented");
+        return -1;
       }
 
       @Override
       public BytesRef getPayload() throws IOException {
-        throw new RuntimeException("UPMEM not implemented");
+        return null;
       }
 
       @Override
@@ -145,7 +169,7 @@ public final class DpuTermsEnum extends TermsEnum {
 
       @Override
       public long cost() {
-        throw new RuntimeException("UPMEM not implemented");
+        return 0;
       }
     };
   }

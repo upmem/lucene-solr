@@ -61,11 +61,14 @@ void search(flat_search_context_t *ctx, uint32_t field_id, char *value) {
             nb_output++;
 
         }
-    }
 
-    finalize_results(nb_output);
+        finalize_results(nb_output);
+    } else {
+        no_search();
+    }
 }
 
 void no_search() {
+    accumulate_idf_output(0, 0, 0);
     finalize_results(0);
 }
