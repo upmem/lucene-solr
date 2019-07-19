@@ -44,14 +44,13 @@ public class TestDemo extends LuceneTestCase {
 
   public void testIndexSearch() throws Exception {
     Path dir = getDataPath("test-files/docs");
-//    Path indexDir = createTempDir("ContribDemoTest");
-    Path indexDir = Paths.get("/home/jchauzi/work/dpu-lucene-solr/wiki_index_80");
-//    IndexFiles.main(new String[] { "-create", "-docs", dir.toString(), "-index", indexDir.toString()});
-//    testOneSearch(indexDir, "apache", 3);
-//    testOneSearch(indexDir, "patent", 8);
+    Path indexDir = createTempDir("ContribDemoTest");
+    IndexFiles.main(new String[] { "-create", "-docs", dir.toString(), "-index", indexDir.toString()});
+    testOneSearch(indexDir, "apache", 3);
+    testOneSearch(indexDir, "patent", 8);
     testOneSearch(indexDir, "lucene", 0);
-//    testOneSearch(indexDir, "gnu", 6);
-//    testOneSearch(indexDir, "derivative", 8);
-//    testOneSearch(indexDir, "license", 13);
+    testOneSearch(indexDir, "gnu", 6);
+    testOneSearch(indexDir, "derivative", 8);
+    testOneSearch(indexDir, "license", 13);
   }
 }
