@@ -5,27 +5,28 @@
 #include <defs.h>
 #include <stdlib.h>
 
-#include "perfcounter.h"
-#include "mram_structure.h"
-#include "search.h"
 #include "bytes_ref.h"
-#include "postings_enum.h"
 #include "context.h"
-#include "norms.h"
 #include "dpu_output.h"
 #include "idf_output.h"
+#include "mram_structure.h"
+#include "norms.h"
+#include "perfcounter.h"
+#include "postings_enum.h"
+#include "search.h"
 
 static flat_norms_entry_t norms_entries[NR_THREADS];
 
-static void finalize_results(uint32_t nb_output) {
+static void finalize_results(uint32_t nb_output)
+{
     unsigned int task_id = me();
-    dpu_output_t last_output = {.doc_id = 0xffffffffU};
-    MRAM_WRITE(OUTPUTS_BUFFER_OFFSET + task_id * OUTPUTS_BUFFER_SIZE_PER_THREAD + nb_output * OUTPUT_SIZE,
-               &last_output,
-               OUTPUT_SIZE);
+    dpu_output_t last_output = { .doc_id = 0xffffffffU };
+    MRAM_WRITE(
+        OUTPUTS_BUFFER_OFFSET + task_id * OUTPUTS_BUFFER_SIZE_PER_THREAD + nb_output * OUTPUT_SIZE, &last_output, OUTPUT_SIZE);
 }
 
-void search(flat_search_context_t *ctx, uint32_t field_id, char *value) {
+void search(flat_search_context_t *ctx, uint32_t field_id, char *value)
+{
     unsigned int task_id = me();
     unsigned int nb_output = 0;
     flat_field_reader_t *field_reader = fetch_flat_field_reader(ctx, field_id);
@@ -41,11 +42,9 @@ void search(flat_search_context_t *ctx, uint32_t field_id, char *value) {
         impacts(&postings_enum, terms_enum, POSTINGS_ENUM_FREQS, &ctx->doc_reader, &ctx->for_util);
 
         flat_norms_entry_t *norms_entry = &norms_entries[task_id];
-        mram_readX(flat_context_offsets[task_id]
-                   + sizeof(flat_search_context_t)
-                   + sizeof(flat_norms_entry_t) * field_reader->field_info.number,
-                   norms_entry,
-                   sizeof(flat_norms_entry_t));
+        mram_readX(flat_context_offsets[task_id] + sizeof(flat_search_context_t)
+                + sizeof(flat_norms_entry_t) * field_reader->field_info.number,
+            norms_entry, sizeof(flat_norms_entry_t));
 
         accumulate_idf_output(field_reader->doc_count, doc_freq, field_reader->sum_total_term_freq);
 
@@ -53,13 +52,11 @@ void search(flat_search_context_t *ctx, uint32_t field_id, char *value) {
         while ((output.doc_id = postings_next_doc(&postings_enum)) != NO_MORE_DOCS) {
 
             output.freq = postings_enum.freq;
-            output.doc_norm = (uint32_t) getNorms(norms_entry, output.doc_id, &ctx->norms_data);
+            output.doc_norm = (uint32_t)getNorms(norms_entry, output.doc_id, &ctx->norms_data);
 
-            MRAM_WRITE(OUTPUTS_BUFFER_OFFSET + task_id * OUTPUTS_BUFFER_SIZE_PER_THREAD + nb_output * OUTPUT_SIZE,
-                       &output,
-                       OUTPUT_SIZE);
+            MRAM_WRITE(
+                OUTPUTS_BUFFER_OFFSET + task_id * OUTPUTS_BUFFER_SIZE_PER_THREAD + nb_output * OUTPUT_SIZE, &output, OUTPUT_SIZE);
             nb_output++;
-
         }
 
         finalize_results(nb_output);
@@ -68,7 +65,8 @@ void search(flat_search_context_t *ctx, uint32_t field_id, char *value) {
     }
 }
 
-void no_search() {
+void no_search()
+{
     accumulate_idf_output(0, 0, 0);
     finalize_results(0);
 }

@@ -5,10 +5,10 @@
 #ifndef DPU_POC_FIELD_READER_STRUCT_H
 #define DPU_POC_FIELD_READER_STRUCT_H
 
-#include <stdint.h>
-#include <stdbool.h>
-#include "query.h"
 #include "fst_struct.h"
+#include "query.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 typedef struct {
     char name[MAX_FIELD_SIZE];
@@ -34,4 +34,4 @@ typedef struct {
     uint64_t sum_total_term_freq;
 } flat_field_reader_t;
 
-#endif //DPU_POC_FIELD_READER_STRUCT_H
+#endif // DPU_POC_FIELD_READER_STRUCT_H

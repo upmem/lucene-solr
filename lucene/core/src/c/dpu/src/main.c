@@ -2,24 +2,24 @@
  * Copyright (c) 2014-2019 - uPmem
  */
 
-#include <stddef.h>
-#include <defs.h>
-#include <perfcounter.h>
-#include <ktrace.h>
-#include <barrier.h>
 #include <alloc.h>
+#include <barrier.h>
+#include <defs.h>
+#include <ktrace.h>
+#include <perfcounter.h>
+#include <stddef.h>
 
 #include "context.h"
-#include "search.h"
 #include "idf_output.h"
+#include "search.h"
 
-#define TASKLETS_INITIALIZER \
-    TASKLETS(NR_THREADS, main, 1024, 0)
+#define TASKLETS_INITIALIZER TASKLETS(NR_THREADS, main, 1024, 0)
 #include <rt.h>
 
 BARRIER_INIT(init_barrier, NR_THREADS)
 
-int main(void) {
+int main(void)
+{
     query_t *query;
     flat_search_context_t *context;
     uint32_t task_id = me();
@@ -52,9 +52,7 @@ int main(void) {
         search(context, query->field_id, query->value);
         end = perfcounter_get();
 
-        ktrace("[%i] perfcounter:%u\n",
-               task_id,
-               (unsigned)(end - start));
+        ktrace("[%i] perfcounter:%u\n", task_id, (unsigned)(end - start));
     }
 
     return 0;

@@ -5,12 +5,12 @@
 #ifndef __POSTINGS_ENUM_H__
 #define __POSTINGS_ENUM_H__
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
+#include "for_util.h"
 #include "mram_reader.h"
 #include "terms_enum.h"
-#include "for_util.h"
 
 #define POSTINGS_ENUM_FREQS (1 << 3)
 #define POSTINGS_ENUM_POSITIONS (1 << 4)
@@ -51,7 +51,8 @@ typedef struct {
     flat_for_util_t *for_util;
 } postings_enum_t;
 
-void impacts(postings_enum_t *postings_enum, terms_enum_t *terms_enum, uint32_t flags, mram_reader_t *doc_reader, flat_for_util_t *for_util);
+void impacts(postings_enum_t *postings_enum, terms_enum_t *terms_enum, uint32_t flags, mram_reader_t *doc_reader,
+    flat_for_util_t *for_util);
 
 int32_t postings_next_doc(postings_enum_t *postings_enum);
 

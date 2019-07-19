@@ -10,7 +10,8 @@
 static uint32_t MAX_DATA_SIZE = 0xFFFFFFFF;
 #define math_max(x, y) (((x) > (y)) ? (x) : (y))
 
-static void initialize_max_data_size(flat_for_util_t *for_util) {
+static void initialize_max_data_size(flat_for_util_t *for_util)
+{
     if (MAX_DATA_SIZE == 0xFFFFFFFF) {
         uint32_t max_data_size = 0;
         for (int i = 1; i <= 32; ++i) {
@@ -19,7 +20,7 @@ static void initialize_max_data_size(flat_for_util_t *for_util) {
                 continue;
             }
             packed_int_decoder_t *decoder = for_util->decoders + i;
-            uint32_t iterations = (uint32_t) ((BLOCK_SIZE + decoder->byte_value_count - 1) / decoder->byte_value_count);
+            uint32_t iterations = (uint32_t)((BLOCK_SIZE + decoder->byte_value_count - 1) / decoder->byte_value_count);
             max_data_size = math_max(max_data_size, iterations * decoder->byte_value_count);
         }
 
@@ -27,10 +28,10 @@ static void initialize_max_data_size(flat_for_util_t *for_util) {
     }
 }
 
-static postings_enum_t *postings_enum_reset(postings_enum_t *postings_enum, term_state_t *state, uint32_t flags) {
+static postings_enum_t *postings_enum_reset(postings_enum_t *postings_enum, term_state_t *state, uint32_t flags)
+{
     postings_enum->doc_freq = state->doc_freq;
-    postings_enum->total_term_freq = (uint64_t) (postings_enum->index_has_freq ? state->total_term_freq
-                                                                               : postings_enum->doc_freq);
+    postings_enum->total_term_freq = (uint64_t)(postings_enum->index_has_freq ? state->total_term_freq : postings_enum->doc_freq);
     postings_enum->doc_term_start_fp = state->doc_start_fp;
     postings_enum->skip_offset = state->skip_offset;
     postings_enum->singleton_doc_id = state->singleton_doc_id;
@@ -39,7 +40,7 @@ static postings_enum_t *postings_enum_reset(postings_enum_t *postings_enum, term
             postings_enum->doc_in_initialized = true;
             mram_reader_fill(&postings_enum->doc_in, postings_enum->start_doc_in);
         }
-        set_index(&postings_enum->doc_in, (uint32_t) postings_enum->doc_term_start_fp);
+        set_index(&postings_enum->doc_in, (uint32_t)postings_enum->doc_term_start_fp);
     }
 
     postings_enum->doc = -1;
@@ -58,14 +59,15 @@ static postings_enum_t *postings_enum_reset(postings_enum_t *postings_enum, term
     return postings_enum;
 }
 
-void impacts(postings_enum_t *postings_enum, terms_enum_t *terms_enum, uint32_t flags, mram_reader_t *doc_reader, flat_for_util_t *for_util) {
+void impacts(postings_enum_t *postings_enum, terms_enum_t *terms_enum, uint32_t flags, mram_reader_t *doc_reader,
+    flat_for_util_t *for_util)
+{
     decode_metadata(terms_enum->current_frame);
 
     flat_field_info_t *field_info = &terms_enum->field_reader->field_info;
     term_state_t *state = &terms_enum->current_frame->state;
 
-    bool index_has_positions =
-            compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
+    bool index_has_positions = compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
 
     if (!index_has_positions || ((flags & POSTINGS_ENUM_POSITIONS) == 0)) {
         // todo no reuse
@@ -73,13 +75,11 @@ void impacts(postings_enum_t *postings_enum, terms_enum_t *terms_enum, uint32_t 
         postings_enum->start_doc_in = doc_reader;
         postings_enum->doc_in_initialized = false;
 
-        postings_enum->index_has_freq =
-                compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS) >= 0;
-        postings_enum->index_has_pos =
-                compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
-        postings_enum->index_has_offsets = compare_index_options(field_info->index_options,
-                                                                 INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >=
-                                           0;
+        postings_enum->index_has_freq = compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS) >= 0;
+        postings_enum->index_has_pos
+            = compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
+        postings_enum->index_has_offsets
+            = compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0;
         postings_enum->index_has_payloads = field_info->store_payloads;
 
         postings_enum->for_util = for_util;
@@ -95,16 +95,13 @@ void impacts(postings_enum_t *postings_enum, terms_enum_t *terms_enum, uint32_t 
     }
 }
 
-static void decode(packed_int_decoder_t *decoder,
-                   uint8_t *blocks,
-                   uint32_t blocks_offset,
-                   int32_t *values,
-                   uint32_t values_offset,
-                   uint32_t iterations) {
+static void decode(packed_int_decoder_t *decoder, uint8_t *blocks, uint32_t blocks_offset, int32_t *values,
+    uint32_t values_offset, uint32_t iterations)
+{
     int32_t next_value = 0;
     uint32_t bits_left = decoder->bits_per_value;
     for (int i = 0; i < iterations * decoder->byte_block_count; ++i) {
-        uint32_t bytes = (uint32_t) (blocks[blocks_offset++] & 0xFF);
+        uint32_t bytes = (uint32_t)(blocks[blocks_offset++] & 0xFF);
         if (bits_left > 8) {
             // just buffer
             bits_left -= 8;
@@ -124,7 +121,8 @@ static void decode(packed_int_decoder_t *decoder,
     }
 }
 
-static void read_block(mram_reader_t *in, flat_for_util_t *for_util, uint8_t *encoded, int32_t *decoded) {
+static void read_block(mram_reader_t *in, flat_for_util_t *for_util, uint8_t *encoded, int32_t *decoded)
+{
     uint32_t num_bits = mram_read_byte(in, false);
 
     if (num_bits == ALL_VALUES_EQUAL) {
@@ -148,7 +146,8 @@ static void read_block(mram_reader_t *in, flat_for_util_t *for_util, uint8_t *en
     decode(decoder, encoded, 0, decoded, 0, iters);
 }
 
-static void skip_block(mram_reader_t *in, flat_for_util_t *for_util) {
+static void skip_block(mram_reader_t *in, flat_for_util_t *for_util)
+{
     uint32_t num_bits = mram_read_byte(in, false);
 
     if (num_bits == ALL_VALUES_EQUAL) {
@@ -164,11 +163,8 @@ static void skip_block(mram_reader_t *in, flat_for_util_t *for_util) {
     in->index += encoded_size;
 }
 
-static void read_vint_block(mram_reader_t *doc_in,
-                            int32_t *doc_buffer,
-                            int32_t *freq_buffer,
-                            uint32_t num,
-                            bool index_has_freq) {
+static void read_vint_block(mram_reader_t *doc_in, int32_t *doc_buffer, int32_t *freq_buffer, uint32_t num, bool index_has_freq)
+{
     if (index_has_freq) {
         for (int i = 0; i < num; i++) {
             uint32_t code = mram_read_vint(doc_in, false);
@@ -186,33 +182,33 @@ static void read_vint_block(mram_reader_t *doc_in,
     }
 }
 
-static void postings_refill_docs(postings_enum_t *postings_enum) {
+static void postings_refill_docs(postings_enum_t *postings_enum)
+{
     uint32_t left = postings_enum->doc_freq - postings_enum->doc_up_to;
 
     if (left >= BLOCK_SIZE) {
-        read_block(&postings_enum->doc_in, postings_enum->for_util, postings_enum->encoded,
-                   postings_enum->doc_delta_buffer);
+        read_block(&postings_enum->doc_in, postings_enum->for_util, postings_enum->encoded, postings_enum->doc_delta_buffer);
 
         if (postings_enum->index_has_freq) {
             if (postings_enum->needs_freq) {
-                read_block(&postings_enum->doc_in, postings_enum->for_util, postings_enum->encoded,
-                           postings_enum->freq_buffer);
+                read_block(&postings_enum->doc_in, postings_enum->for_util, postings_enum->encoded, postings_enum->freq_buffer);
             } else {
                 skip_block(&postings_enum->doc_in, postings_enum->for_util);
             }
         }
     } else if (postings_enum->doc_freq == 1) {
         postings_enum->doc_delta_buffer[0] = postings_enum->singleton_doc_id;
-        postings_enum->freq_buffer[0] = (int32_t) postings_enum->total_term_freq;
+        postings_enum->freq_buffer[0] = (int32_t)postings_enum->total_term_freq;
     } else {
         read_vint_block(&postings_enum->doc_in, postings_enum->doc_delta_buffer, postings_enum->freq_buffer, left,
-                        postings_enum->index_has_freq);
+            postings_enum->index_has_freq);
     }
 
     postings_enum->doc_buffer_up_to = 0;
 }
 
-int32_t postings_next_doc(postings_enum_t *postings_enum) {
+int32_t postings_next_doc(postings_enum_t *postings_enum)
+{
     if (postings_enum->doc_up_to == postings_enum->doc_freq) {
         return postings_enum->doc = NO_MORE_DOCS;
     }
@@ -228,5 +224,3 @@ int32_t postings_next_doc(postings_enum_t *postings_enum) {
 
     return postings_enum->doc;
 }
-
-

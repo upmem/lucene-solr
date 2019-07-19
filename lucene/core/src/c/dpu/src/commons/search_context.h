@@ -5,11 +5,11 @@
 #ifndef DPU_POC_SEARCH_CONTEXT_H
 #define DPU_POC_SEARCH_CONTEXT_H
 
-#include "mram_reader_struct.h"
-#include "for_util_struct.h"
-#include "query.h"
 #include "field_reader_struct.h"
+#include "for_util_struct.h"
+#include "mram_reader_struct.h"
 #include "norms_struct.h"
+#include "query.h"
 
 typedef struct {
     struct {
@@ -38,7 +38,7 @@ typedef struct {
 
     uint32_t empty_outputs_length;
 
-    DPU_PTR(uint8_t *)empty_outputs;
+    DPU_PTR(uint8_t *) empty_outputs;
 } flat_search_context_t;
 
-#endif //DPU_POC_SEARCH_CONTEXT_H
+#endif // DPU_POC_SEARCH_CONTEXT_H

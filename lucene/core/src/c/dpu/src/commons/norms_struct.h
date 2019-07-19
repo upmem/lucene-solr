@@ -15,4 +15,4 @@ typedef struct {
     uint64_t normsOffset;
 } flat_norms_entry_t;
 
-#endif //DPU_POC_NORMS_STRUCT_H
+#endif // DPU_POC_NORMS_STRUCT_H

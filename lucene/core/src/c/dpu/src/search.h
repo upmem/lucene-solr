@@ -10,4 +10,4 @@
 void search(flat_search_context_t *ctx, uint32_t field, char *value);
 void no_search();
 
-#endif //DPU_POC_SEARCH_H
+#endif // DPU_POC_SEARCH_H

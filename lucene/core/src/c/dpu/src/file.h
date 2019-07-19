@@ -36,4 +36,4 @@ typedef struct {
     mram_addr_t offset;
 } file_buffer_t;
 
-#endif //DPU_POC_FILE_H
+#endif // DPU_POC_FILE_H

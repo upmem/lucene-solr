@@ -17,4 +17,4 @@ typedef struct {
     string_map_entry_t *entries;
 } string_map_t;
 
-#endif //DPU_POC_STRING_MAP_H
+#endif // DPU_POC_STRING_MAP_H

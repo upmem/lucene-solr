@@ -1,8 +1,8 @@
-#include "mutex.h"
-#include "dpu_output.h"
 #include "dpu_characteristics.h"
-#include "mram_structure.h"
+#include "dpu_output.h"
 #include "mram_access.h"
+#include "mram_structure.h"
+#include "mutex.h"
 
 MUTEX_INIT(idf_mutex);
 static unsigned nb_thread_accumulated;
@@ -25,7 +25,7 @@ void accumulate_idf_output(uint32_t doc_count, uint32_t doc_freq, uint64_t total
     idf_output.doc_count += doc_count;
     idf_output.doc_freq += doc_freq;
     idf_output.total_term_freq += total_term_freq;
-    nb_thread_accumulated ++;
+    nb_thread_accumulated++;
 
     mutex_unlock(idf_mutex);
 

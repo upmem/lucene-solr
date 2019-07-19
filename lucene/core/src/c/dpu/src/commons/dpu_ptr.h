@@ -13,4 +13,4 @@
 #define DPU_NULL 0
 #endif
 
-#endif //DPU_POC_DPU_PTR_H
+#endif // DPU_POC_DPU_PTR_H

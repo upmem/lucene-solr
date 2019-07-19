@@ -16,4 +16,4 @@ typedef struct {
     uint32_t mram_length;
 } flat_fst_t;
 
-#endif //DPU_POC_FST_STRUCT_H
+#endif // DPU_POC_FST_STRUCT_H

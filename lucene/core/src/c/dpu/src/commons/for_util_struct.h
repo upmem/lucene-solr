@@ -5,8 +5,8 @@
 #ifndef DPU_POC_FOR_UTIL_STRUCT_H
 #define DPU_POC_FOR_UTIL_STRUCT_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #define FOR_UTIL_ARRAY_LENGTH 33
 
@@ -18,4 +18,4 @@ typedef struct {
     uint32_t iterations[FOR_UTIL_ARRAY_LENGTH];
 } flat_for_util_t;
 
-#endif //DPU_POC_FOR_UTIL_STRUCT_H
+#endif // DPU_POC_FOR_UTIL_STRUCT_H

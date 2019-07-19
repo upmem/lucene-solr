@@ -2,12 +2,12 @@
  * Copyright (c) 2014-2019 - uPmem
  */
 
-#include <string.h>
-#include <defs.h>
-#include "terms_enum.h"
 #include "terms_enum_frame.h"
 #include "alloc_wrapper.h"
 #include "field_info.h"
+#include "terms_enum.h"
+#include <defs.h>
+#include <string.h>
 
 #define MAX_LONGS_SIZE 3
 
@@ -18,15 +18,11 @@ static bool next_frame_entry(terms_enum_frame_t *frame);
 static void next_frame_leaf(terms_enum_frame_t *frame);
 static bool next_frame_non_leaf(terms_enum_frame_t *frame);
 
-static void decode_term(int64_t *longs,
-                        mram_reader_t *in,
-                        flat_field_info_t *field_info,
-                        term_state_t *state,
-                        bool absolute) {
-    bool field_has_positions =
-            compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
-    bool field_has_offsets =
-            compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0;
+static void decode_term(int64_t *longs, mram_reader_t *in, flat_field_info_t *field_info, term_state_t *state, bool absolute)
+{
+    bool field_has_positions = compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS) >= 0;
+    bool field_has_offsets
+        = compare_index_options(field_info->index_options, INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0;
     bool field_has_payloads = field_info->store_payloads;
 
     if (absolute) {
@@ -61,7 +57,8 @@ static void decode_term(int64_t *longs,
     }
 }
 
-void decode_metadata(terms_enum_frame_t *frame) {
+void decode_metadata(terms_enum_frame_t *frame)
+{
     int32_t limit = frame->is_leaf_block ? frame->next_ent : frame->state.term_block_ord;
     bool absolute = frame->metadata_up_to == 0;
 
@@ -86,7 +83,8 @@ void decode_metadata(terms_enum_frame_t *frame) {
     frame->state.term_block_ord = frame->metadata_up_to;
 }
 
-void term_enum_frame_init(terms_enum_frame_t *frame, terms_enum_t *term_enum, int32_t ord) {
+void term_enum_frame_init(terms_enum_frame_t *frame, terms_enum_t *term_enum, int32_t ord)
+{
     frame->ste = term_enum;
     frame->ord = ord;
     frame->state.last_pos_block_offset = -1;
@@ -94,18 +92,20 @@ void term_enum_frame_init(terms_enum_frame_t *frame, terms_enum_t *term_enum, in
     frame->state.total_term_freq = -1;
 }
 
-void rewind_frame(terms_enum_frame_t *frame) {
+void rewind_frame(terms_enum_frame_t *frame)
+{
     frame->fp = frame->fp_orig;
     frame->next_ent = -1;
     frame->has_terms = frame->has_terms_orig;
     if (frame->is_floor) {
         frame->floor_data_reader.index = 0;
         frame->num_follow_floor_blocks = wram_read_vint(&frame->floor_data_reader);
-        frame->next_floor_label = (uint32_t) (wram_read_byte(&frame->floor_data_reader) & 0xFF);
+        frame->next_floor_label = (uint32_t)(wram_read_byte(&frame->floor_data_reader) & 0xFF);
     }
 }
 
-void set_floor_data(terms_enum_frame_t *frame, wram_reader_t *in, bytes_ref_t *source) {
+void set_floor_data(terms_enum_frame_t *frame, wram_reader_t *in, bytes_ref_t *source)
+{
     uint32_t num_bytes = source->length - (in->index - source->offset);
     if (num_bytes > MAX_FLOOR_DATA) {
         halt();
@@ -114,15 +114,16 @@ void set_floor_data(terms_enum_frame_t *frame, wram_reader_t *in, bytes_ref_t *s
     frame->floor_data_reader.buffer = frame->floor_data;
     frame->floor_data_reader.index = 0;
     frame->num_follow_floor_blocks = wram_read_vint(&frame->floor_data_reader);
-    frame->next_floor_label = (uint32_t) (wram_read_byte(&frame->floor_data_reader) & 0xFF);
+    frame->next_floor_label = (uint32_t)(wram_read_byte(&frame->floor_data_reader) & 0xFF);
 }
 
-void scan_to_floor_frame(terms_enum_frame_t *frame, bytes_ref_t *target) {
+void scan_to_floor_frame(terms_enum_frame_t *frame, bytes_ref_t *target)
+{
     if (!frame->is_floor || (target->length < frame->prefix)) {
         return;
     }
 
-    uint32_t target_label = (uint32_t) (target->bytes[target->offset + frame->prefix] & 0xFF);
+    uint32_t target_label = (uint32_t)(target->bytes[target->offset + frame->prefix] & 0xFF);
 
     if (target_label < frame->next_floor_label) {
         return;
@@ -141,7 +142,7 @@ void scan_to_floor_frame(terms_enum_frame_t *frame, bytes_ref_t *target) {
             frame->next_floor_label = 256;
             break;
         } else {
-            frame->next_floor_label = (uint32_t) (wram_read_byte(&frame->floor_data_reader) & 0xFF);
+            frame->next_floor_label = (uint32_t)(wram_read_byte(&frame->floor_data_reader) & 0xFF);
             if (target_label < frame->next_floor_label) {
                 break;
             }
@@ -154,18 +155,20 @@ void scan_to_floor_frame(terms_enum_frame_t *frame, bytes_ref_t *target) {
     }
 }
 
-void load_next_floor_block(terms_enum_frame_t *frame) {
+void load_next_floor_block(terms_enum_frame_t *frame)
+{
     frame->fp = frame->fp_end;
     frame->next_ent = -1;
     load_block(frame);
 }
 
-void load_block(terms_enum_frame_t *frame) {
+void load_block(terms_enum_frame_t *frame)
+{
     if (frame->next_ent != -1) {
         return;
     }
 
-    set_index(&frame->ste->in, (uint32_t) frame->fp);
+    set_index(&frame->ste->in, (uint32_t)frame->fp);
     uint32_t code = mram_read_vint(&frame->ste->in, false);
     frame->ent_count = code >> 1;
     frame->is_last_in_floor = (code & 1) != 0;
@@ -191,11 +194,13 @@ void load_block(terms_enum_frame_t *frame) {
     frame->fp_end = frame->ste->in.index - frame->ste->in.base;
 }
 
-seek_status_t scan_to_term(terms_enum_frame_t *frame, bytes_ref_t *target, bool exact_only) {
+seek_status_t scan_to_term(terms_enum_frame_t *frame, bytes_ref_t *target, bool exact_only)
+{
     return frame->is_leaf_block ? scan_to_term_leaf(frame, target, exact_only) : scan_to_term_non_leaf(frame, target, exact_only);
 }
 
-static seek_status_t scan_to_term_leaf(terms_enum_frame_t *frame, bytes_ref_t *target, bool exact_only) {
+static seek_status_t scan_to_term_leaf(terms_enum_frame_t *frame, bytes_ref_t *target, bool exact_only)
+{
     frame->ste->term_exists = true;
     frame->sub_code = 0;
 
@@ -206,7 +211,7 @@ static seek_status_t scan_to_term_leaf(terms_enum_frame_t *frame, bytes_ref_t *t
         return SEEK_STATUS_END;
     }
 
-    start_loop:
+start_loop:
     while (true) {
         frame->next_ent++;
         frame->suffix = mram_read_vint(&frame->suffixes_reader, false);
@@ -247,7 +252,7 @@ static seek_status_t scan_to_term_leaf(terms_enum_frame_t *frame, bytes_ref_t *t
             }
         }
     }
-    end_loop:
+end_loop:
     if (exact_only) {
         fill_term(frame);
     }
@@ -255,7 +260,8 @@ static seek_status_t scan_to_term_leaf(terms_enum_frame_t *frame, bytes_ref_t *t
     return SEEK_STATUS_END;
 }
 
-static seek_status_t scan_to_term_non_leaf(terms_enum_frame_t *frame, bytes_ref_t *target, bool exact_only) {
+static seek_status_t scan_to_term_non_leaf(terms_enum_frame_t *frame, bytes_ref_t *target, bool exact_only)
+{
     if (frame->next_ent == frame->ent_count) {
         if (exact_only) {
             fill_term(frame);
@@ -264,7 +270,7 @@ static seek_status_t scan_to_term_non_leaf(terms_enum_frame_t *frame, bytes_ref_
         return SEEK_STATUS_END;
     }
 
-    start_loop:
+start_loop:
     while (frame->next_ent < frame->ent_count) {
         frame->next_ent++;
         uint32_t code = mram_read_vint(&frame->suffixes_reader, false);
@@ -310,14 +316,12 @@ static seek_status_t scan_to_term_non_leaf(terms_enum_frame_t *frame, bytes_ref_
                 fill_term(frame);
 
                 if (!exact_only && !frame->ste->term_exists) {
-                    frame->ste->current_frame = push_frame_fp(frame->ste,
-                                                              (uint32_t) frame->ste->current_frame->last_sub_fp,
-                                                              term_len);
+                    frame->ste->current_frame
+                        = push_frame_fp(frame->ste, (uint32_t)frame->ste->current_frame->last_sub_fp, term_len);
                     load_block(frame->ste->current_frame);
                     while (next_frame_entry(frame->ste->current_frame)) {
-                        frame->ste->current_frame = push_frame_fp(frame->ste,
-                                                                  (uint32_t) frame->ste->current_frame->last_sub_fp,
-                                                                  frame->ste->term->length);
+                        frame->ste->current_frame = push_frame_fp(
+                            frame->ste, (uint32_t)frame->ste->current_frame->last_sub_fp, frame->ste->term->length);
                         load_block(frame->ste->current_frame);
                     }
                 }
@@ -338,7 +342,8 @@ static seek_status_t scan_to_term_non_leaf(terms_enum_frame_t *frame, bytes_ref_
     return SEEK_STATUS_END;
 }
 
-static void fill_term(terms_enum_frame_t *frame) {
+static void fill_term(terms_enum_frame_t *frame)
+{
     uint32_t term_len = frame->prefix + frame->suffix;
     frame->ste->term->length = term_len;
     bytes_ref_grow(frame->ste->term, term_len);
@@ -348,7 +353,8 @@ static void fill_term(terms_enum_frame_t *frame) {
     frame->suffixes_reader.index = previous_index;
 }
 
-static bool next_frame_entry(terms_enum_frame_t *frame) {
+static bool next_frame_entry(terms_enum_frame_t *frame)
+{
     if (frame->is_leaf_block) {
         next_frame_leaf(frame);
         return false;
@@ -357,7 +363,8 @@ static bool next_frame_entry(terms_enum_frame_t *frame) {
     }
 }
 
-static void next_frame_leaf(terms_enum_frame_t *frame) {
+static void next_frame_leaf(terms_enum_frame_t *frame)
+{
     frame->next_ent++;
     frame->suffix = mram_read_vint(&frame->suffixes_reader, false);
     frame->start_byte_pos = frame->suffixes_reader.index - frame->suffixes_reader.base;
@@ -367,7 +374,8 @@ static void next_frame_leaf(terms_enum_frame_t *frame) {
     frame->ste->term_exists = true;
 }
 
-static bool next_frame_non_leaf(terms_enum_frame_t *frame) {
+static bool next_frame_non_leaf(terms_enum_frame_t *frame)
+{
     while (true) {
         if (frame->next_ent == frame->ent_count) {
             load_next_floor_block(frame);

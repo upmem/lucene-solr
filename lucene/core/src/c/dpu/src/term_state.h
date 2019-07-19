@@ -21,4 +21,4 @@ typedef struct {
     int32_t skip_offset;
 } term_state_t;
 
-#endif //DPU_POC_TERM_STATE_H
+#endif // DPU_POC_TERM_STATE_H

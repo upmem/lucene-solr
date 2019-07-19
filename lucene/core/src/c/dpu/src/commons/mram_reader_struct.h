@@ -10,7 +10,7 @@
 typedef struct {
     mram_addr_t index;
     mram_addr_t base;
-    DPU_PTR(mram_cache_t*) cache;
+    DPU_PTR(mram_cache_t *) cache;
 } mram_reader_t;
 
-#endif //DPU_POC_MRAM_READER_STRUCT_H
+#endif // DPU_POC_MRAM_READER_STRUCT_H

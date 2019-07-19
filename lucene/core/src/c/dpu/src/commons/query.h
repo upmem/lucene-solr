@@ -15,4 +15,4 @@ typedef struct {
     uint32_t field_id;
 } query_t;
 
-#endif //DPU_POC_QUERY_H
+#endif // DPU_POC_QUERY_H

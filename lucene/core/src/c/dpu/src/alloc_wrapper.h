@@ -7,6 +7,6 @@
 
 #include <stddef.h>
 
-void* malloc(size_t size);
+void *malloc(size_t size);
 
-#endif //DPU_POC_ALLOC_WRAPPER_H
+#endif // DPU_POC_ALLOC_WRAPPER_H

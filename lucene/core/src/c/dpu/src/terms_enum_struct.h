@@ -5,13 +5,13 @@
 #ifndef DPU_POC_TERMS_ENUM_STRUCT_H
 #define DPU_POC_TERMS_ENUM_STRUCT_H
 
-#include <stdint.h>
-#include <stdbool.h>
-#include "for_util.h"
 #include "field_info.h"
-#include <search_context.h>
-#include "wram_reader.h"
+#include "for_util.h"
 #include "term_state.h"
+#include "wram_reader.h"
+#include <search_context.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 #define BLOCK_SIZE 128
 
@@ -91,4 +91,4 @@ typedef struct _terms_enum_t {
     bool term_exists;
 } terms_enum_t;
 
-#endif //DPU_POC_TERMS_ENUM_STRUCT_H
+#endif // DPU_POC_TERMS_ENUM_STRUCT_H
