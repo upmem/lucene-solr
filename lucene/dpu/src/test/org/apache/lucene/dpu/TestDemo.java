@@ -110,12 +110,12 @@ public class TestDemo {
     Path largerDatasetPath = Paths.get(wikipediaDatasetDirectoryName);
     Path indexDir = javaTempDir;
     IndexFiles.main(new String[] { "-create", "-docs", largerDatasetPath.toAbsolutePath().toString(), "-index", indexDir.toString()});
-    testOneSearch(indexDir, "apache", 219);
-    testOneSearch(indexDir, "patent", 1231);
+    testOneSearch(indexDir, "apache", 204);
+    testOneSearch(indexDir, "patent", 1194);
     testOneSearch(indexDir, "lucene", 4);
-    testOneSearch(indexDir, "gnu", 359);
-    testOneSearch(indexDir, "derivative", 797);
-    testOneSearch(indexDir, "license", 1330);
+    testOneSearch(indexDir, "gnu", 352);
+    testOneSearch(indexDir, "derivative", 764);
+    testOneSearch(indexDir, "license", 1297);
   }
 
   private Path getDataPath(String name) throws IOException {
