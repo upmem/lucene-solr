@@ -5,7 +5,10 @@
 #ifndef __FOR_UTIL_H__
 #define __FOR_UTIL_H__
 
+#include <stdbool.h>
 #include <stdint.h>
+
+#define FOR_UTIL_ARRAY_LENGTH 33
 
 typedef struct {
     uint32_t bits_per_value;
@@ -17,6 +20,12 @@ typedef struct {
     uint32_t int_mask;
 } packed_int_decoder_t;
 
-#include "for_util_struct.h"
+typedef struct {
+    bool setup_done[FOR_UTIL_ARRAY_LENGTH];
+
+    uint32_t encoded_sizes[FOR_UTIL_ARRAY_LENGTH];
+    packed_int_decoder_t decoders[FOR_UTIL_ARRAY_LENGTH];
+    uint32_t iterations[FOR_UTIL_ARRAY_LENGTH];
+} flat_for_util_t;
 
 #endif /* __FOR_UTIL_H__ */

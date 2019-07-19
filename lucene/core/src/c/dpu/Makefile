@@ -4,11 +4,8 @@ CFLAGS := -Wall -Os -g
 MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 BASEDIR := $(dir $(MKFILE_PATH))
 SRCDIR := $(BASEDIR)/src
-COMDIR := $(SRCDIR)/commons
 SOURCES := $(wildcard $(SRCDIR)/*.c)
-SRC_HEADERS := $(wildcard $(SRCDIR)/*.h)
-COMMONS_HEADERS := $(wildcard $(COMDIR)/*.h)
-HEADERS := $(SRC_HEADERS) $(COMMONS_HEADERS)
+HEADERS := $(wildcard $(SRCDIR)/*.h)
 
 FORMATED_FILES=${SOURCES} ${HEADERS}
 CHECK_FORMAT_DEPENDENCIES=$(addsuffix -check-format,${FORMATED_FILES})
@@ -24,7 +21,7 @@ EXEC := $(BUILDDIR)/term_search.dpu
 all: $(EXEC)
 
 $(EXEC): $(SOURCES) $(HEADERS)
-	$(CC) -o $@ $(SOURCES) $(CFLAGS) -I$(COMDIR)
+	$(CC) -o $@ $(SOURCES) $(CFLAGS)
 
 clean:
 	rm -f $(EXEC)

@@ -9,7 +9,7 @@
 #include "for_util.h"
 #include "term_state.h"
 #include "wram_reader.h"
-#include <search_context.h>
+#include "search_context.h"
 #include <stdbool.h>
 #include <stdint.h>
 

@@ -5,6 +5,8 @@
 #ifndef __DPU_OUTPUT_H__
 #define __DPU_OUTPUT_H__
 
+#include <stdint.h>
+
 #define SCORE_PRECISION_SHIFT (10)
 #define SCORE_PRECISION (1 << SCORE_PRECISION_SHIFT)
 

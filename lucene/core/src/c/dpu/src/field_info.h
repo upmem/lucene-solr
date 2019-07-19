@@ -5,10 +5,6 @@
 #ifndef DPU_POC_FIELD_INFO_H
 #define DPU_POC_FIELD_INFO_H
 
-#include "file.h"
-#include "string_map.h"
-#include <query.h>
-#include <stdbool.h>
 #include <stdint.h>
 
 typedef enum {

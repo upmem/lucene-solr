@@ -5,7 +5,7 @@
 #ifndef DPU_POC_MRAM_ACCESS_H
 #define DPU_POC_MRAM_ACCESS_H
 
-#include "../commons/query.h"
+#include "query.h"
 #include <mram.h>
 
 #define MRAM_ACCESS_ALIGNMENT 8

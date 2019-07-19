@@ -6,7 +6,7 @@
 #define DPU_POC_SEARCH_CONTEXT_H
 
 #include "field_reader_struct.h"
-#include "for_util_struct.h"
+#include "for_util.h"
 #include "mram_reader_struct.h"
 #include "norms_struct.h"
 #include "query.h"

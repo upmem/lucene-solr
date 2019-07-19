@@ -10,8 +10,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef enum { INPUT_TYPE_BYTE1, INPUT_TYPE_BYTE2, INPUT_TYPE_BYTE4 } input_type_t;
-
 #include "fst_struct.h"
 
 typedef struct {

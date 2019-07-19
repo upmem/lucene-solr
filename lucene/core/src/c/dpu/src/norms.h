@@ -4,7 +4,7 @@
 #include "codec_footer.h"
 #include "field_info.h"
 #include "mram_reader.h"
-#include <norms_struct.h>
+#include "norms_struct.h"
 #include <stdint.h>
 
 uint64_t getNorms(flat_norms_entry_t *entry, uint32_t doc, mram_reader_t *norms_data);

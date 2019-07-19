@@ -16,7 +16,7 @@
 #include "mram_structure.h"
 #include "norms.h"
 #include "terms_enum_frame.h"
-#include <search_context.h>
+#include "search_context.h"
 
 static terms_enum_t terms_enums[NR_THREADS];
 static bytes_ref_t empty_outputs_bytes_ref[NR_THREADS];

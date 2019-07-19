@@ -6,6 +6,7 @@
 #define DPU_POC_MRAM_READER_STRUCT_H
 
 #include "dpu_ptr.h"
+#include "mram_cache.h"
 
 typedef struct {
     mram_addr_t index;

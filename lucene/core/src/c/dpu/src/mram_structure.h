@@ -5,6 +5,7 @@
 #ifndef DPU_POC_MRAM_STRUCTURE_H
 #define DPU_POC_MRAM_STRUCTURE_H
 
+#include <assert.h>
 #include "dpu_characteristics.h"
 #include "dpu_output.h"
 #include "query.h"

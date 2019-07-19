@@ -5,6 +5,7 @@
 #ifndef DPU_POC_FIELD_READER_STRUCT_H
 #define DPU_POC_FIELD_READER_STRUCT_H
 
+#include "field_info.h"
 #include "fst_struct.h"
 #include "query.h"
 #include <stdbool.h>
