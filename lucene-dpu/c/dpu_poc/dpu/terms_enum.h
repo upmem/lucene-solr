@@ -5,10 +5,10 @@
 #ifndef DPU_POC_TERMS_ENUM_H
 #define DPU_POC_TERMS_ENUM_H
 
-#include <stdbool.h>
 #include "fst.h"
 #include "term_state.h"
 #include "terms_enum_struct.h"
+#include <stdbool.h>
 
 bool seek_exact(terms_enum_t *terms_enum, bytes_ref_t *target);
 
@@ -20,4 +20,4 @@ int32_t get_doc_freq(terms_enum_t *terms_enum);
 
 int64_t get_total_term_freq(terms_enum_t *terms_enum);
 
-#endif //DPU_POC_TERMS_ENUM_H
+#endif // DPU_POC_TERMS_ENUM_H

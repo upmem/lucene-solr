@@ -24,4 +24,4 @@ bytes_ref_t *bytes_ref_add(bytes_ref_t *prefix, bytes_ref_t *output);
 
 void bytes_ref_grow(bytes_ref_t *bytes_ref, uint32_t capacity);
 
-#endif //DPU_POC_BYTES_REF_H
+#endif // DPU_POC_BYTES_REF_H

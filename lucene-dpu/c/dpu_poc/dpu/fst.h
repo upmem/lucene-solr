@@ -5,16 +5,10 @@
 #ifndef DPU_POC_FST_H
 #define DPU_POC_FST_H
 
-#include <stdint.h>
-#include <stdbool.h>
 #include "bytes_ref.h"
 #include "mram_reader.h"
-
-typedef enum {
-    INPUT_TYPE_BYTE1,
-    INPUT_TYPE_BYTE2,
-    INPUT_TYPE_BYTE4
-} input_type_t;
+#include <stdbool.h>
+#include <stdint.h>
 
 #include "fst_struct.h"
 
@@ -36,4 +30,4 @@ bool arc_is_last(arc_t *arc);
 arc_t *get_first_arc(flat_fst_t *fst, arc_t *arc);
 arc_t *find_target_arc(flat_fst_t *fst, int32_t label_to_match, arc_t *follow, arc_t *arc, mram_reader_t *in);
 
-#endif //DPU_POC_FST_H
+#endif // DPU_POC_FST_H

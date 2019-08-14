@@ -5,16 +5,12 @@
 #ifndef DPU_POC_TERMS_ENUM_FRAME_H
 #define DPU_POC_TERMS_ENUM_FRAME_H
 
-#include <stdbool.h>
-#include <stdint.h>
 #include "fst.h"
 #include "terms_enum_struct.h"
+#include <stdbool.h>
+#include <stdint.h>
 
-typedef enum {
-    SEEK_STATUS_END,
-    SEEK_STATUS_FOUND,
-    SEEK_STATUS_NOT_FOUND
-} seek_status_t;
+typedef enum { SEEK_STATUS_END, SEEK_STATUS_FOUND, SEEK_STATUS_NOT_FOUND } seek_status_t;
 
 void term_enum_frame_init(terms_enum_frame_t *frame, terms_enum_t *term_enum, int32_t ord);
 void rewind_frame(terms_enum_frame_t *frame);
@@ -27,4 +23,4 @@ seek_status_t scan_to_term(terms_enum_frame_t *frame, bytes_ref_t *target, bool 
 
 void decode_metadata(terms_enum_frame_t *frame);
 
-#endif //DPU_POC_TERMS_ENUM_FRAME_H
+#endif // DPU_POC_TERMS_ENUM_FRAME_H

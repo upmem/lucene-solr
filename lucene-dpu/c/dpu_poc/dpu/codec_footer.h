@@ -13,4 +13,4 @@ typedef struct {
     uint64_t checksum;
 } codec_footer_t;
 
-#endif //DPU_POC_CODEC_FOOTER_H
+#endif // DPU_POC_CODEC_FOOTER_H

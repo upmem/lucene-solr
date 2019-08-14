@@ -6,10 +6,6 @@
 #define DPU_POC_FIELD_INFO_H
 
 #include <stdint.h>
-#include <stdbool.h>
-#include <query.h>
-#include "file.h"
-#include "string_map.h"
 
 typedef enum {
     DOC_VALUES_TYPE_NONE,
@@ -28,8 +24,9 @@ typedef enum {
     INDEX_OPTIONS_DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS,
 } index_options_t;
 
-static inline int32_t compare_index_options(index_options_t first, index_options_t second) {
-    return ((int32_t) first) - ((int32_t) second);
+static inline int32_t compare_index_options(index_options_t first, index_options_t second)
+{
+    return ((int32_t)first) - ((int32_t)second);
 }
 
-#endif //DPU_POC_FIELD_INFO_H
+#endif // DPU_POC_FIELD_INFO_H
