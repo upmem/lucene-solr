@@ -5,7 +5,6 @@ set(CMAKE_C_STANDARD 11)
 
 file(GLOB SOURCES *.c)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 add_executable(dpu ${SOURCES})
-set_target_properties(dpu PROPERTIES INTERPROCEDURAL_OPTIMIZATION False)
+set_target_properties(dpu PROPERTIES INTERPROCEDURAL_OPTIMIZATION True)
 target_include_directories(dpu PUBLIC ../commons)
