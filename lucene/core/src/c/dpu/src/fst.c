@@ -96,7 +96,7 @@ static arc_t *_find_target_arc(
         arc->pos_arcs_start = in->index - in->base;
         uint32_t low = 0;
         uint32_t high = (uint32_t)(arc->num_arcs - 1);
-        while (low <= high) {
+        while ((int32_t)low <= (int32_t)high) {
             uint32_t mid = (low + high) >> 1;
             set_index(in, (uint32_t)arc->pos_arcs_start);
             mram_skip_bytes(in, arc->bytes_per_arc * mid + 1, true);
