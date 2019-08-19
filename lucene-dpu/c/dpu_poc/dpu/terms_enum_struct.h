@@ -18,7 +18,7 @@
 // todo adjust the MAX_FLOOR_DATA
 #define MAX_FLOOR_DATA 64
 
-#define MAX_ARCS_LENGTH 6
+#define MAX_ARCS_LENGTH 7
 #define MAX_STACK_LENGTH 5
 
 typedef struct _terms_enum_t terms_enum_t;
