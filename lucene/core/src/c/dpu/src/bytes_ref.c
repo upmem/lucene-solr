@@ -51,7 +51,7 @@ bytes_ref_t *bytes_ref_add(bytes_ref_t *prefix, bytes_ref_t *output)
     bytes_ref_t *result = malloc(sizeof(*result));
     result->bytes = malloc(prefix->length + output->length);
     memcpy(result->bytes, prefix->bytes + prefix->offset, prefix->length);
-    memcpy(result->bytes + prefix->offset, output->bytes + output->offset, output->length);
+    memcpy(result->bytes + prefix->length, output->bytes + output->offset, output->length);
     result->offset = 0;
     result->length = prefix->length + output->length;
     result->capacity = prefix->length + output->length;
