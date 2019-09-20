@@ -9,7 +9,7 @@ if (NOT DEFINED UPMEM_HOME)
     set(UPMEM_HOME $ENV{UPMEM_HOME})
 endif ()
 
-include(${UPMEM_HOME}/usr/share/upmem/cmake/include/host/DpuHost.cmake)
+include(${UPMEM_HOME}/share/upmem/cmake/include/host/DpuHost.cmake)
 
 file(GLOB SOURCES *.c x86_process/*.c)
 
@@ -34,7 +34,7 @@ ExternalProject_Add(
         dpu
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${DPU_PROJECT_RELATIVE_PATH}
         BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${DPU_PROJECT_RELATIVE_PATH}
-        CMAKE_ARGS -DCMAKE_TOOLCHAIN_FILE=${UPMEM_HOME}/usr/share/upmem/cmake/dpu.cmake -DCMAKE_BUILD_TYPE=${DPU_PROJECT_BUILD_TYPE} -DUPMEM_HOME=${UPMEM_HOME}
+        CMAKE_ARGS -DCMAKE_TOOLCHAIN_FILE=${UPMEM_HOME}/share/upmem/cmake/dpu.cmake -DCMAKE_BUILD_TYPE=${DPU_PROJECT_BUILD_TYPE} -DUPMEM_HOME=${UPMEM_HOME}
         BUILD_ALWAYS TRUE
         INSTALL_COMMAND ""
 )
