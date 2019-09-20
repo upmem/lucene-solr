@@ -7,6 +7,8 @@ set(CMAKE_C_STANDARD 11)
 
 if (NOT DEFINED UPMEM_HOME)
     set(UPMEM_HOME $ENV{UPMEM_HOME})
+else ()
+    set(UPMEM_HOME "/usr")
 endif ()
 
 include(${UPMEM_HOME}/share/upmem/cmake/include/host/DpuHost.cmake)
