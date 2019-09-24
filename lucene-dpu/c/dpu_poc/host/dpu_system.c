@@ -16,7 +16,7 @@ static bool load_query(dpu_system_t *dpu_system, const char *field, const char *
 static bool process_results(dpu_system_t *dpu_system);
 static bool save_mram(dpu_system_t *dpu_system, const char* path);
 
-dpu_system_t* initialize_dpu_system(unsigned int nr_dpus, const char* dpu_binary, dpu_type_t dpu_type, char* dpu_profile) {
+dpu_system_t* initialize_dpu_system(unsigned int nr_dpus, const char* dpu_binary) {
     dpu_system_t *dpu_system = malloc(sizeof(*dpu_system));
 
     if (dpu_system == NULL) {
@@ -24,20 +24,21 @@ dpu_system_t* initialize_dpu_system(unsigned int nr_dpus, const char* dpu_binary
     }
 
     struct dpu_logging_config_t log = {
-            .source = KTRACE,
+            .source = PRINTF,
             .destination_directory_name = "/tmp"
     };
 
-    struct dpu_param_t params = {
-            .type = dpu_type,
-            .profile = dpu_profile,
-            .logging_config = &log
-    };
+    struct dpu_param_t params;
+    dpu_fill_default_params(&params);
+    params.logging_config = &log;
+    params.profile = "cycleAccurate=true";
 
-    if (dpu_alloc_dpus(&params, nr_dpus, &dpu_system->ranks, &dpu_system->nr_ranks, &dpu_system->nr_dpus) != DPU_API_SUCCESS) {
-        fprintf(stderr, "cannot allocate rank\n");
-        free(dpu_system);
-        return NULL;
+    if (dpu_alloc_dpus(&params, nr_dpus, &dpu_system->ranks,
+                       &dpu_system->nr_ranks,
+                       &dpu_system->nr_dpus) != DPU_API_SUCCESS) {
+      fprintf(stderr, "cannot allocate rank\n");
+      free(dpu_system);
+      return NULL;
     }
 
     for (unsigned each_rank = 0; each_rank < dpu_system->nr_ranks; ++each_rank) {

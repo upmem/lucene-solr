@@ -14,9 +14,6 @@
 
 #define DPU_BINARY_PATH STR(DPU_BINARY)
 
-#define DPU_TYPE FUNCTIONAL_SIMULATOR
-#define DPU_PROFILE "cycleAccurate=true"
-
 int main(int argc, char **argv) {
     if (argc != 4) {
         fprintf(stderr, "usage: %s <index directory> <field name> <term search>\n", basename(argv[0]));
@@ -35,7 +32,7 @@ int main(int argc, char **argv) {
     }
 
     uint32_t nr_dpus = (nr_segments / NR_THREADS) + (((nr_segments % NR_THREADS) == 0) ? 0 : 1);
-    dpu_system_t *dpu_system = initialize_dpu_system(nr_dpus, DPU_BINARY_PATH, DPU_TYPE, DPU_PROFILE);
+    dpu_system_t *dpu_system = initialize_dpu_system(nr_dpus, DPU_BINARY_PATH);
 
     if (dpu_system == NULL) {
         return 2;
