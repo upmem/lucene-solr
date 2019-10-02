@@ -5,7 +5,6 @@
 #include <alloc.h>
 #include <barrier.h>
 #include <defs.h>
-#include <ktrace.h>
 #include <perfcounter.h>
 #include <stddef.h>
 
@@ -52,7 +51,7 @@ int main(void)
         search(context, query->field_id, query->value);
         end = perfcounter_get();
 
-        ktrace("[%i] perfcounter:%u\n", task_id, (unsigned)(end - start));
+        /* printf("[%i] perfcounter:%u\n", task_id, (unsigned)(end - start)); */
     }
 
     return 0;
