@@ -45,7 +45,6 @@ import com.upmem.dpu.host.api.DpuProgram;
 import com.upmem.dpu.host.api.DpuRank;
 import com.upmem.dpujni.DpuDescription;
 import com.upmem.dpujni.DpuMramTransfer;
-import com.upmem.properties.DpuType;
 import org.apache.lucene.codecs.lucene50.ForUtil;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.FieldInfos;
@@ -177,13 +176,13 @@ public final class DpuManager implements Closeable {
 
   private final Map<Integer, Integer> fieldIdMapping;
 
-  public DpuManager(int nrOfSegments, DpuType type, String profile) throws DpuException, IOException {
+  public DpuManager(int nrOfSegments) throws DpuException, IOException {
     int nrOfDpus = (nrOfSegments / NR_THREADS) + (((nrOfSegments % NR_THREADS) == 0) ? 0 : 1);
-    this.description = DpuRank.getDescription(type, profile);
+    this.description = DpuRank.getDescription("");
     int nrOfDpusPerRank = this.description.nrOfControlInterfaces * this.description.nrOfDpusPerControlInterface;
 
     if (nrOfDpusPerRank ==  0) {
-      throw new IOException("no DPU available for the configuration " + type.toString() + "/" + profile);
+      throw new IOException("no DPU available");
     }
 
     int nrOfRanks = (nrOfDpus / nrOfDpusPerRank) + (((nrOfDpus % nrOfDpusPerRank) == 0) ? 0 : 1);
@@ -194,7 +193,7 @@ public final class DpuManager implements Closeable {
     DpuProgram program = DpuProgram.from(executableFileName);
 
     for (int rankIndex = 0; rankIndex < this.ranks.length; rankIndex++) {
-      this.ranks[rankIndex] = DpuRank.allocate(type, profile);
+      this.ranks[rankIndex] = DpuRank.allocate("");
       this.ranks[rankIndex].load(program);
     }
 

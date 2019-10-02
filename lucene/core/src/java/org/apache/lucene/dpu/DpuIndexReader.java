@@ -83,14 +83,14 @@ public final class DpuIndexReader extends LeafReader {
   private static final String METADATA_CODEC = "Lucene80NormsMetadata";
   private static final String METADATA_EXTENSION = "nvm";
 
-  public DpuIndexReader(Directory directory, SegmentInfos sis, DpuConfiguration configuration) throws DpuException, IOException {
+  public DpuIndexReader(Directory directory, SegmentInfos sis) throws DpuException, IOException {
     this.directory = directory;
     this.segmentInfos = sis;
     this.fields = new TreeMap<>();
     this.norms = new TreeMap<>();
     this.docBases = new ArrayList<>();
     this.storedFieldsReaders = new ArrayList<>();
-    this.dpuManager = new DpuManager(sis.size(), configuration.type, configuration.profile);
+    this.dpuManager = new DpuManager(sis.size());
 
     int maxDoc = 0;
     int numDocs = 0;
@@ -153,14 +153,14 @@ public final class DpuIndexReader extends LeafReader {
     this.maxDoc = maxDoc;
   }
 
-  public static DpuIndexReader open(final Directory directory, DpuConfiguration configuration) throws IOException {
+  public static DpuIndexReader open(final Directory directory) throws IOException {
     return new SegmentInfos.FindSegmentsFile<DpuIndexReader>(directory) {
       @Override
       protected DpuIndexReader doBody(String segmentFileName) throws IOException {
         SegmentInfos sis = SegmentInfos.readCommit(directory, segmentFileName);
 
         try {
-          return new DpuIndexReader(directory, sis, configuration);
+          return new DpuIndexReader(directory, sis);
         } catch (DpuException e) {
           throw new IOException(e);
         }

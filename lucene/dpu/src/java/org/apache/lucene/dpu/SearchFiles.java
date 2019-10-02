@@ -44,7 +44,7 @@ public class SearchFiles {
   /** Simple command-line based search demo. */
   public static void main(String[] args) throws Exception {
     String usage =
-      "Usage:\tjava org.apache.lucene.dpu.SearchFiles [-index dir] [-field f] [-repeat n] [-queries file] [-query string] [-raw] [-paging hitsPerPage] [-target fsim|hw]\n\nSee http://lucene.apache.org/core/4_1_0/demo/ for details.";
+      "Usage:\tjava org.apache.lucene.dpu.SearchFiles [-index dir] [-field f] [-repeat n] [-queries file] [-query string] [-raw] [-paging hitsPerPage]\n\nSee http://lucene.apache.org/core/4_1_0/demo/ for details.";
     if (args.length > 0 && ("-h".equals(args[0]) || "-help".equals(args[0]))) {
       System.out.println(usage);
       System.exit(0);
@@ -57,7 +57,6 @@ public class SearchFiles {
     boolean raw = false;
     String queryString = null;
     int hitsPerPage = 10;
-    DpuConfiguration configuration = DpuConfiguration.forSimulator();
     
     for(int i = 0;i < args.length;i++) {
       if ("-index".equals(args[i])) {
@@ -84,18 +83,9 @@ public class SearchFiles {
           System.exit(1);
         }
         i++;
-      } else if ("-target".equals(args[i])) {
-        if ("fsim".equals(args[i + 1])) {
-          configuration = DpuConfiguration.forSimulator();
-        } else if ("hw".equals(args[i + 1])) {
-          configuration = DpuConfiguration.forHardware();
-        } else {
-          System.err.println("Unknown DPU target '" + args[i + 1] + "'.");
-          System.exit(1);
-        }
       }
     }
-    IndexReader reader = DpuIndexReader.open(FSDirectory.open(Paths.get(index)), configuration);
+    IndexReader reader = DpuIndexReader.open(FSDirectory.open(Paths.get(index)));
     IndexSearcher searcher = new IndexSearcher(reader);
     Analyzer analyzer = new StandardAnalyzer();
 
