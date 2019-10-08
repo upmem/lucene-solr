@@ -69,7 +69,7 @@ grant {
 
   // UPMEM
   permission java.lang.RuntimePermission "getenv.*";
-  permission java.lang.RuntimePermission "loadLibrary.dpujni-2019.*";
+  permission java.lang.RuntimePermission "loadLibrary.dpujni";
   permission java.io.FilePermission "<<ALL FILES>>", "read";
 
   // read access to all system properties:
