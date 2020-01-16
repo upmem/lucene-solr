@@ -1,5 +1,7 @@
+NR_TASKLETS ?= 10
+
 CC := clang --target=dpu-upmem-dpurte
-CFLAGS := -Wall -Os -g -DNR_TASKLETS=16
+CFLAGS := -Wall -Os -g -DNR_TASKLETS=${NR_TASKLETS}
 
 MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 BASEDIR := $(dir $(MKFILE_PATH))
