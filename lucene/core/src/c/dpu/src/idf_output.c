@@ -1,4 +1,3 @@
-#include "dpu_characteristics.h"
 #include "dpu_output.h"
 #include "mram_access.h"
 #include "mram_structure.h"
@@ -29,7 +28,7 @@ void accumulate_idf_output(uint32_t doc_count, uint32_t doc_freq, uint64_t total
 
     mutex_unlock(idf_mutex);
 
-    if (nb_thread_accumulated == NR_THREADS) {
+    if (nb_thread_accumulated == NR_TASKLETS) {
         MRAM_WRITE(IDF_OUTPUT_OFFSET, &idf_output, IDF_OUTPUT_SIZE);
     }
 }

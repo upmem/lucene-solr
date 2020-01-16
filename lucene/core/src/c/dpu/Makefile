@@ -1,5 +1,5 @@
 CC := clang --target=dpu-upmem-dpurte
-CFLAGS := -Wall -Os -g
+CFLAGS := -Wall -Os -g -DNR_TASKLETS=16
 
 MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 BASEDIR := $(dir $(MKFILE_PATH))
@@ -35,4 +35,4 @@ clean:
 check-format: ${CHECK_FORMAT_DEPENDENCIES}
 
 fmt: ${DO_FORMAT_DEPENDENCIES}
-	
+

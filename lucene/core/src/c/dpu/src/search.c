@@ -15,7 +15,7 @@
 #include "postings_enum.h"
 #include "search.h"
 
-static flat_norms_entry_t norms_entries[NR_THREADS];
+static flat_norms_entry_t norms_entries[NR_TASKLETS];
 
 static void finalize_results(uint32_t nb_output)
 {

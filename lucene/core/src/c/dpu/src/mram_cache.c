@@ -3,9 +3,8 @@
  */
 
 #include "mram_cache.h"
-#include "dpu_characteristics.h"
 
-mram_cache_t caches[NR_THREADS];
+mram_cache_t caches[NR_TASKLETS];
 
 uint32_t update_mram_cache(mram_cache_t *cache, mram_addr_t mram_addr)
 {

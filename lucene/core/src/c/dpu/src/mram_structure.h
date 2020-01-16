@@ -6,7 +6,6 @@
 #define DPU_POC_MRAM_STRUCTURE_H
 
 #include <assert.h>
-#include "dpu_characteristics.h"
 #include "dpu_output.h"
 #include "query.h"
 #include <stdint.h>
@@ -24,7 +23,7 @@ _Static_assert(
 #define OUTPUTS_BUFFER_OFFSET (DMA_ALIGNED(IDF_OUTPUT_OFFSET + IDF_OUTPUT_SIZE))
 #define OUTPUT_SIZE 16
 #define OUTPUTS_BUFFER_SIZE_PER_THREAD (OUTPUTS_PER_THREAD * OUTPUT_SIZE)
-#define OUTPUTS_BUFFER_SIZE (OUTPUTS_BUFFER_SIZE_PER_THREAD * NR_THREADS)
+#define OUTPUTS_BUFFER_SIZE (OUTPUTS_BUFFER_SIZE_PER_THREAD * NR_TASKLETS)
 _Static_assert(sizeof(dpu_output_t) == OUTPUT_SIZE, "check that OUTPUT_SIZE matches the effective size of dpu_ouput_t");
 
 #define QUERY_BUFFER_OFFSET (DMA_ALIGNED(OUTPUTS_BUFFER_OFFSET + OUTPUTS_BUFFER_SIZE))
@@ -36,6 +35,6 @@ _Static_assert(QUERY_BUFFER_SIZE == sizeof(query_t), "Check that QUERY_BUFFER_SI
 _Static_assert(SEGMENT_SUMMARY_ENTRY_SIZE == sizeof(uint64_t),
     "Check that SEGMENT_SUMMARY_ENTRY_SIZE matches the effective size used to read it on DPU side");
 
-#define SEGMENTS_OFFSET (DMA_ALIGNED(SEGMENT_SUMMARY_OFFSET + NR_THREADS * SEGMENT_SUMMARY_ENTRY_SIZE))
+#define SEGMENTS_OFFSET (DMA_ALIGNED(SEGMENT_SUMMARY_OFFSET + NR_TASKLETS * SEGMENT_SUMMARY_ENTRY_SIZE))
 
 #endif // DPU_POC_MRAM_STRUCTURE_H

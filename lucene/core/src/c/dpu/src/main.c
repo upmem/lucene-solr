@@ -12,10 +12,7 @@
 #include "idf_output.h"
 #include "search.h"
 
-#define TASKLETS_INITIALIZER TASKLETS(NR_THREADS, main, 1024, 0)
-#include <rt.h>
-
-BARRIER_INIT(init_barrier, NR_THREADS)
+BARRIER_INIT(init_barrier, NR_TASKLETS)
 
 int main(void)
 {

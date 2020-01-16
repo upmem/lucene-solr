@@ -5,14 +5,13 @@
 #ifndef DPU_POC_INIT_H
 #define DPU_POC_INIT_H
 
-#include "dpu_characteristics.h"
 #include "query.h"
 #include "search_context.h"
 #include "terms_enum.h"
 #include <stdbool.h>
 #include <stdint.h>
 
-extern uint64_t flat_context_offsets[NR_THREADS];
+extern uint64_t flat_context_offsets[NR_TASKLETS];
 
 query_t *fetch_query(bool do_init);
 

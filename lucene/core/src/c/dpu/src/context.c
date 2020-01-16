@@ -12,20 +12,19 @@
 
 #include "alloc_wrapper.h"
 #include "context.h"
-#include "dpu_characteristics.h"
 #include "mram_structure.h"
 #include "norms.h"
 #include "terms_enum_frame.h"
 #include "search_context.h"
 
-static terms_enum_t terms_enums[NR_THREADS];
-static bytes_ref_t empty_outputs_bytes_ref[NR_THREADS];
+static terms_enum_t terms_enums[NR_TASKLETS];
+static bytes_ref_t empty_outputs_bytes_ref[NR_TASKLETS];
 
 static __attribute__((aligned(MRAM_ACCESS_ALIGNMENT))) query_t the_query;
-static __attribute__((aligned(MRAM_ACCESS_ALIGNMENT))) flat_search_context_t flat_contexts[NR_THREADS];
-static __attribute__((aligned(MRAM_ACCESS_ALIGNMENT))) flat_field_reader_t field_readers[NR_THREADS];
+static __attribute__((aligned(MRAM_ACCESS_ALIGNMENT))) flat_search_context_t flat_contexts[NR_TASKLETS];
+static __attribute__((aligned(MRAM_ACCESS_ALIGNMENT))) flat_field_reader_t field_readers[NR_TASKLETS];
 
-__attribute__((aligned(MRAM_ACCESS_ALIGNMENT))) uint64_t flat_context_offsets[NR_THREADS];
+__attribute__((aligned(MRAM_ACCESS_ALIGNMENT))) uint64_t flat_context_offsets[NR_TASKLETS];
 
 static inline uint32_t dma_aligned(uint32_t x) { return (x + (MRAM_ACCESS_ALIGNMENT - 1)) & ~(MRAM_ACCESS_ALIGNMENT - 1); }
 
