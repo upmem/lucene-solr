@@ -23,7 +23,7 @@ EXEC := $(BUILDDIR)/term_search.dpu
 all: $(EXEC)
 
 $(EXEC): $(SOURCES) $(HEADERS)
-	$(CC) -o $@ $(SOURCES) $(CFLAGS)
+	$(CC) $(CFLAGS) -o $@ $(SOURCES)
 
 clean:
 	rm -f $(EXEC)
