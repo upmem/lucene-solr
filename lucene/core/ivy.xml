@@ -20,6 +20,6 @@
   <info organisation="org.apache.lucene" module="core"/>
   <!-- UPMEM -->
   <dependencies>
-    <dependency org="com.upmem.dpu" name="javahostapi" rev="2019.4.0"/>
+    <dependency org="com.upmem.dpu" name="javahostapi" rev="2020.1.0"/>
   </dependencies>
 </ivy-module>
