@@ -9,7 +9,7 @@
 void *malloc(size_t size)
 {
     // todo fix unitialized values
-    return mem_alloc_dma(size);
+    return mem_alloc(size);
 
     //    void* ptr = mem_alloc_dma(size);
     //    memset(ptr, '\0', size);
