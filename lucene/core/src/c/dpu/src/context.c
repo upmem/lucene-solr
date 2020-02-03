@@ -65,20 +65,20 @@ flat_search_context_t *initialize_flat_context(uint32_t index)
 {
     flat_search_context_t *context = flat_contexts + index;
 
-    MRAM_READ(
-        &flat_context_offsets[index], SEGMENT_SUMMARY_OFFSET + index * SEGMENT_SUMMARY_ENTRY_SIZE, SEGMENT_SUMMARY_ENTRY_SIZE);
+    mram_read((__mram_ptr void *)(SEGMENT_SUMMARY_OFFSET + index * SEGMENT_SUMMARY_ENTRY_SIZE), &flat_context_offsets[index],
+        SEGMENT_SUMMARY_ENTRY_SIZE);
 
     if ((flat_context_offsets[index] & 0xffffffffl) == 0xffffffffl) {
         return NULL;
     }
 
-    mram_readX((mram_addr_t)flat_context_offsets[index], context, sizeof(*context));
+    mram_read((__mram_ptr void *)flat_context_offsets[index], context, sizeof(*context));
 
     uint32_t variable_length_content_size = dma_aligned(context->term_reader.nr_fields * sizeof(flat_field_reader_t))
         + dma_aligned(context->nr_norms_entries * sizeof(flat_norms_entry_t));
     uint32_t empty_outputs_size = dma_aligned(context->empty_outputs_length);
     context->empty_outputs = malloc(empty_outputs_size);
-    mram_readX((mram_addr_t)(flat_context_offsets[index] + dma_aligned(sizeof(*context)) + variable_length_content_size),
+    mram_read((__mram_ptr void *)(flat_context_offsets[index] + dma_aligned(sizeof(*context)) + variable_length_content_size),
         context->empty_outputs, empty_outputs_size);
 
     mram_cache_t *cache = mram_cache_for(index);
@@ -95,8 +95,8 @@ flat_field_reader_t *fetch_flat_field_reader(flat_search_context_t *context, con
 {
     unsigned int task_id = me();
     flat_field_reader_t *res = &field_readers[task_id];
-    mram_readX(flat_context_offsets[task_id] + dma_aligned(sizeof(*context))
-            + dma_aligned(context->nr_norms_entries * sizeof(flat_norms_entry_t)) + field_id * sizeof(flat_field_reader_t),
+    mram_read((__mram_ptr void *)(flat_context_offsets[task_id] + dma_aligned(sizeof(*context))
+                  + dma_aligned(context->nr_norms_entries * sizeof(flat_norms_entry_t)) + field_id * sizeof(flat_field_reader_t)),
         res, sizeof(flat_field_reader_t));
 
     uint8_t *empty_outputs = context->empty_outputs;

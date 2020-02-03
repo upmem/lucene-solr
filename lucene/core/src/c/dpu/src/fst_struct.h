@@ -16,7 +16,7 @@ typedef struct {
     DPU_PTR(bytes_ref_t *) empty_output;
     int32_t start_node;
     input_type_t input_type;
-    mram_addr_t mram_start_offset;
+    uintptr_t mram_start_offset;
     uint32_t mram_length;
 } flat_fst_t;
 

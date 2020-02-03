@@ -29,6 +29,6 @@ void accumulate_idf_output(uint32_t doc_count, uint32_t doc_freq, uint64_t total
     mutex_unlock(idf_mutex);
 
     if (nb_thread_accumulated == NR_TASKLETS) {
-        MRAM_WRITE(IDF_OUTPUT_OFFSET, &idf_output, IDF_OUTPUT_SIZE);
+        mram_write(&idf_output, IDF_OUTPUT_OFFSET, IDF_OUTPUT_SIZE);
     }
 }

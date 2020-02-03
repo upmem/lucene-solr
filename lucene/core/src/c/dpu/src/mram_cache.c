@@ -6,9 +6,9 @@
 
 mram_cache_t caches[NR_TASKLETS];
 
-uint32_t update_mram_cache(mram_cache_t *cache, mram_addr_t mram_addr)
+uint32_t update_mram_cache(mram_cache_t *cache, uintptr_t mram_addr)
 {
-    mram_addr_t line_start_addr = mram_addr & CACHE_ADDR_MASK;
+    uintptr_t line_start_addr = mram_addr & CACHE_ADDR_MASK;
     if (line_start_addr != cache->cached) {
         fetch_cache_line(cache->contents, line_start_addr);
         cache->cached = line_start_addr;

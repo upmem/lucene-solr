@@ -9,8 +9,8 @@
 #include "mram_cache.h"
 
 typedef struct {
-    mram_addr_t index;
-    mram_addr_t base;
+    uintptr_t index;
+    uintptr_t base;
     DPU_PTR(mram_cache_t *) cache;
 } mram_reader_t;
 

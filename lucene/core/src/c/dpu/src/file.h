@@ -33,7 +33,7 @@ typedef enum {
 
 typedef struct {
     uint32_t length;
-    mram_addr_t offset;
+    uintptr_t offset;
 } file_buffer_t;
 
 #endif // DPU_POC_FILE_H

@@ -225,7 +225,7 @@ start_loop:
             int32_t cmp;
             bool stop;
             if (target_pos < target_limit) {
-                mram_addr_t previous_index = frame->suffixes_reader.index;
+                uintptr_t previous_index = frame->suffixes_reader.index;
                 set_index(&frame->suffixes_reader, byte_pos);
                 uint8_t byte = mram_read_byte(&frame->suffixes_reader, false);
                 frame->suffixes_reader.index = previous_index;
@@ -298,7 +298,7 @@ start_loop:
             bool stop;
 
             if (target_pos < target_limit) {
-                mram_addr_t previous_index = frame->suffixes_reader.index;
+                uintptr_t previous_index = frame->suffixes_reader.index;
                 set_index(&frame->suffixes_reader, byte_pos);
                 uint8_t byte = mram_read_byte(&frame->suffixes_reader, false);
                 frame->suffixes_reader.index = previous_index;
@@ -347,7 +347,7 @@ static void fill_term(terms_enum_frame_t *frame)
     uint32_t term_len = frame->prefix + frame->suffix;
     frame->ste->term->length = term_len;
     bytes_ref_grow(frame->ste->term, term_len);
-    mram_addr_t previous_index = frame->suffixes_reader.index;
+    uintptr_t previous_index = frame->suffixes_reader.index;
     set_index(&frame->suffixes_reader, frame->start_byte_pos);
     mram_read_bytes(&frame->suffixes_reader, frame->ste->term->bytes, frame->prefix, frame->suffix, false);
     frame->suffixes_reader.index = previous_index;

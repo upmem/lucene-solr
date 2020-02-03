@@ -13,10 +13,10 @@
 
 typedef struct {
     uint8_t __attribute__((aligned(MRAM_ACCESS_ALIGNMENT))) contents[CACHE_SIZE];
-    mram_addr_t cached;
+    uintptr_t cached;
 } mram_cache_t;
 
 mram_cache_t *mram_cache_for(uint32_t task_id);
-uint32_t update_mram_cache(mram_cache_t *cache, mram_addr_t mram_addr);
+uint32_t update_mram_cache(mram_cache_t *cache, uintptr_t mram_addr);
 
 #endif // DPU_POC_MRAM_CACHE_H
