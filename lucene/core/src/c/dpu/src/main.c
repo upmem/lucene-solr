@@ -20,7 +20,6 @@ int main(void)
     flat_search_context_t *context;
     uint32_t task_id = me();
     perfcounter_t start, end;
-    barrier_id_t barrier = BARRIER_GET(init_barrier);
 
     if (task_id == 0) {
         mem_reset();
@@ -29,12 +28,12 @@ int main(void)
         query = fetch_query(true);
     }
 
-    barrier_wait(barrier);
+    barrier_wait(&init_barrier);
 
     context = initialize_flat_context(task_id);
 
     if (context == NULL) {
-        barrier_wait(barrier);
+        barrier_wait(&init_barrier);
 
         no_search();
     } else {
@@ -42,7 +41,7 @@ int main(void)
             query = fetch_query(false);
         }
 
-        barrier_wait(barrier);
+        barrier_wait(&init_barrier);
 
         start = perfcounter_get();
         search(context, query->field_id, query->value);
