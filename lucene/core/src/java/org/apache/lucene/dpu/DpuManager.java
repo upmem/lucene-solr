@@ -588,12 +588,12 @@ public final class DpuManager implements Closeable {
 
     for (int eachCi = 0; eachCi < this.description.nrOfControlInterfaces; eachCi++) {
       for (int eachDpu = 0; eachDpu < this.description.nrOfDpusPerControlInterface; eachDpu++) {
-        transfer.add(eachCi, eachDpu, QUERY_BUFFER_OFFSET, query);
+        transfer.add(eachCi, eachDpu, query);
       }
     }
 
     for (DpuRank rank : this.ranks) {
-      rank.copyToMrams(transfer);
+        rank.copyToMrams(transfer, QUERY_BUFFER_SIZE, QUERY_BUFFER_OFFSET);
     }
   }
 
@@ -648,13 +648,13 @@ public final class DpuManager implements Closeable {
             for (int eachDpu = 0; eachDpu < this.description.nrOfDpusPerControlInterface; eachDpu++) {
               RawDpuResult result = new RawDpuResult(eachCi, eachDpu);
               resultList.add(result);
-              outputsTransfer.add(eachCi, eachDpu, OUTPUTS_BUFFER_OFFSET, result.outputs);
-              idfOutputsTransfer.add(eachCi, eachDpu, IDF_OUTPUT_OFFSET, result.idfOutput);
+              outputsTransfer.add(eachCi, eachDpu, result.outputs);
+              idfOutputsTransfer.add(eachCi, eachDpu, result.idfOutput);
             }
           }
 
-          rank.copyFromMrams(outputsTransfer);
-          rank.copyFromMrams(idfOutputsTransfer);
+          rank.copyFromMrams(outputsTransfer, OUTPUT_BUFFER_SIZE, OUTPUTS_BUFFER_OFFSET);
+          rank.copyFromMrams(idfOutputsTransfer, IDF_OUTPUT_SIZE, IDF_OUTPUT_OFFSET);
 
           for (RawDpuResult result : resultList) {
             results.docFreq += readInt(result.idfOutput, DPU_IDF_OUTPUT_DOC_FREQ_OFFSET);
