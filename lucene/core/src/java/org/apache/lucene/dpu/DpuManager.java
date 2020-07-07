@@ -653,7 +653,7 @@ public final class DpuManager implements Closeable {
             }
           }
 
-          rank.copyFromMrams(outputsTransfer, OUTPUT_BUFFER_SIZE, OUTPUTS_BUFFER_OFFSET);
+          rank.copyFromMrams(outputsTransfer, OUTPUTS_BUFFER_SIZE, OUTPUTS_BUFFER_OFFSET);
           rank.copyFromMrams(idfOutputsTransfer, IDF_OUTPUT_SIZE, IDF_OUTPUT_OFFSET);
 
           for (RawDpuResult result : resultList) {
