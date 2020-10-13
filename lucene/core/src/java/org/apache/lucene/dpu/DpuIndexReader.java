@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import com.upmem.dpu.host.api.DpuException;
+import com.upmem.dpu.DpuException;
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.FieldInfosFormat;
 import org.apache.lucene.codecs.FieldsProducer;

@@ -25,6 +25,8 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
+import com.upmem.dpu.DpuException;
+
 import org.apache.lucene.index.Impact;
 import org.apache.lucene.index.Impacts;
 import org.apache.lucene.index.ImpactsEnum;
@@ -44,7 +46,11 @@ public final class DpuTermsEnum extends TermsEnum {
 
   @Override
   public boolean seekExact(BytesRef target) throws IOException {
-    this.results = this.terms.indexReader.dpuManager.search(this.terms.fieldNumber, target);
+    try {
+      this.results = this.terms.indexReader.dpuManager.search(this.terms.fieldNumber, target);
+    } catch (DpuException e) {
+        throw new RuntimeException("error during DPU search", e);
+    }
     return this.results.docFreq != 0;
   }
 

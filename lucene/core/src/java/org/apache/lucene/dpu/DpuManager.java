@@ -20,7 +20,7 @@
  */
 package org.apache.lucene.dpu;
 
-import java.io.Closeable;
+import java.lang.AutoCloseable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -40,11 +40,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-import com.upmem.dpu.host.api.DpuException;
-import com.upmem.dpu.host.api.DpuProgram;
-import com.upmem.dpu.host.api.DpuRank;
-import com.upmem.dpujni.DpuDescription;
-import com.upmem.dpujni.DpuMramTransfer;
+import com.upmem.dpu.Dpu;
+import com.upmem.dpu.DpuDescription;
+import com.upmem.dpu.DpuException;
+import com.upmem.dpu.DpuRank;
+import com.upmem.dpu.DpuSet;
+import com.upmem.dpu.DpuSymbol;
+import com.upmem.dpu.DpuSystem;
 import org.apache.lucene.codecs.lucene50.ForUtil;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.FieldInfos;
@@ -54,7 +56,7 @@ import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.packed.BulkOperationPacked;
 import org.apache.lucene.util.packed.PackedInts;
 
-public final class DpuManager implements Closeable {
+public final class DpuManager implements AutoCloseable {
   private static final String DPU_SEARCH_PROGRAM = "org/apache/lucene/dpu/term_search.dpu";
   private static final int SYSTEM_THREAD = 0;
   private static final int NR_THREADS = 10;
@@ -154,20 +156,19 @@ public final class DpuManager implements Closeable {
   private static final int DPU_MRAM_READER_BASE_OFFSET = 4;
   private static final int DPU_MRAM_READER_CACHE_OFFSET = 8;
 
-
   private static final int DPU_NULL = 0;
 
   private static String dpuSearchProgramInstance = null;
 
-  private final DpuRank[] ranks;
+  private final DpuSystem dpuSystem;
+  private final List<DpuRank> ranks;
   private final DpuDescription description;
 
-  private final Map<DpuRank, int[][][]> docBases;
+  private final int[][][] docBases;
 
   private final Map<Integer, Map<BytesRef, DpuResults>> cachedResults;
 
   private int currentRankId;
-  private int currentCiId;
   private int currentDpuId;
   private int currentThreadId;
   private int currentImageOffset;
@@ -178,26 +179,17 @@ public final class DpuManager implements Closeable {
 
   public DpuManager(int nrOfSegments) throws DpuException, IOException {
     int nrOfDpus = (nrOfSegments / NR_THREADS) + (((nrOfSegments % NR_THREADS) == 0) ? 0 : 1);
-    this.description = DpuRank.getDescription("");
-    int nrOfDpusPerRank = this.description.nrOfControlInterfaces * this.description.nrOfDpusPerControlInterface;
 
-    if (nrOfDpusPerRank ==  0) {
-      throw new IOException("no DPU available");
-    }
-
-    int nrOfRanks = (nrOfDpus / nrOfDpusPerRank) + (((nrOfDpus % nrOfDpusPerRank) == 0) ? 0 : 1);
-
-    this.ranks = new DpuRank[nrOfRanks];
+    this.dpuSystem = DpuSystem.allocate(nrOfDpus, "");
+    this.description = this.dpuSystem.description();
 
     String executableFileName = fetchDpuSearchProgram();
-    DpuProgram program = DpuProgram.from(executableFileName);
+    this.dpuSystem.load(executableFileName);
 
-    for (int rankIndex = 0; rankIndex < this.ranks.length; rankIndex++) {
-      this.ranks[rankIndex] = DpuRank.allocate("");
-      this.ranks[rankIndex].load(program);
-    }
+    this.ranks = this.dpuSystem.ranks();
+    int nrDpusPerRank = this.description.nrOfControlInterfaces * this.description.nrOfDpusPerControlInterface;
 
-    this.docBases = new HashMap<>();
+    this.docBases = new int[this.ranks.size()][nrDpusPerRank][NR_THREADS];
     this.cachedResults = new HashMap<>();
 
     this.memoryImage = new byte[this.description.mramSizeInBytes];
@@ -209,13 +201,11 @@ public final class DpuManager implements Closeable {
 
   public void loadSegment(int segmentNumber, int docBase, FieldInfos fieldInfos, Map<Integer, DpuFieldReader> fieldReaders,
                           ForUtil forUtil, IndexInput termsIn, IndexInput docIn, IndexInput normsData,
-                          Map<Integer, DpuIndexReader.NormsEntry> norms) throws IOException {
-    assert this.currentRankId < this.ranks.length : "UPMEM too many segments for the number of allocated DPUs";
+                          Map<Integer, DpuIndexReader.NormsEntry> norms) throws DpuException, IOException {
+    assert this.currentRankId < this.ranks.size() : "UPMEM too many segments for the number of allocated DPUs";
 
-    int[][][] rankDocBases = this.docBases.computeIfAbsent(this.ranks[this.currentRankId], k ->
-        new int[this.description.nrOfControlInterfaces][this.description.nrOfDpusPerControlInterface][NR_THREADS]);
-
-    rankDocBases[this.currentCiId][this.currentDpuId][this.currentThreadId] = docBase;
+    int nrDpus = this.ranks.get(this.currentRankId).dpus().size();
+    this.docBases[this.currentRankId][this.currentDpuId][this.currentThreadId] = docBase;
 
     int offsetAddress = SEGMENT_SUMMARY_OFFSET + this.currentThreadId * SEGMENT_SUMMARY_ENTRY_SIZE;
     long offset = (this.currentImageOffset & 0xffffffffL) | ((segmentNumber & 0xffffffffL) << 32);
@@ -395,7 +385,7 @@ public final class DpuManager implements Closeable {
 
     this.currentImageOffset = DMA_ALIGNED(fstContentsOffset);
     write(DPU_NULL, this.memoryImage, searchContextOffset + DPU_CONTEXT_EMPTY_OUTPUTS_OFFSET);
-    
+
     int termsInLength = (int) termsIn.length();
     byte[] termsInBuffer = new byte[termsInLength];
     long termsInPos = termsIn.getFilePointer();
@@ -407,7 +397,7 @@ public final class DpuManager implements Closeable {
     write(this.currentImageOffset, this.memoryImage, searchContextOffset + DPU_CONTEXT_TERMS_IN_OFFSET + DPU_MRAM_READER_BASE_OFFSET);
     write(DPU_NULL, this.memoryImage, searchContextOffset + DPU_CONTEXT_TERMS_IN_OFFSET + DPU_MRAM_READER_CACHE_OFFSET);
     this.currentImageOffset += DMA_ALIGNED(termsInLength);
-    
+
     int docInLength = (int) docIn.length();
     byte[] docInBuffer = new byte[docInLength];
     long docInPos = docIn.getFilePointer();
@@ -441,22 +431,18 @@ public final class DpuManager implements Closeable {
       this.currentThreadId = 0;
       this.currentImageOffset = SEGMENTS_OFFSET;
 
-      if (this.currentDpuId == (this.description.nrOfDpusPerControlInterface - 1)) {
+      if (this.currentDpuId == (nrDpus - 1)) {
         this.currentDpuId = 0;
-
-        if (this.currentCiId == (this.description.nrOfControlInterfaces - 1)) {
-          this.currentCiId = 0;
-          this.currentRankId++;
-        } else {
-          this.currentCiId++;
-        }
+        this.currentRankId++;
       } else {
         this.currentDpuId++;
       }
     }
   }
 
-  private void finalizeIndexLoading() {
+  private void finalizeIndexLoading() throws DpuException {
+    int nrRanks = this.ranks.size();
+    int nrDpus = this.ranks.get(this.currentRankId).dpus().size();
     if (this.currentThreadId != 0) {
       for (int eachThread = this.currentThreadId; eachThread < NR_THREADS; eachThread++) {
         int offsetAddress = SEGMENT_SUMMARY_OFFSET + eachThread * SEGMENT_SUMMARY_ENTRY_SIZE;
@@ -469,48 +455,37 @@ public final class DpuManager implements Closeable {
       this.currentThreadId = 0;
       this.currentImageOffset = SEGMENTS_OFFSET;
 
-      if (this.currentDpuId == (this.description.nrOfDpusPerControlInterface - 1)) {
+      if (this.currentDpuId == (nrDpus - 1)) {
         this.currentDpuId = 0;
-
-        if (this.currentCiId == (this.description.nrOfControlInterfaces - 1)) {
-          this.currentCiId = 0;
-          this.currentRankId++;
-        } else {
-          this.currentCiId++;
-        }
+        this.currentRankId++;
       } else {
         this.currentDpuId++;
       }
     }
 
-    if (this.currentRankId < this.ranks.length) {
+    if (this.currentRankId < nrRanks) {
       for (int eachThread = 0; eachThread < NR_THREADS; eachThread++) {
         int offsetAddress = SEGMENT_SUMMARY_OFFSET + eachThread * SEGMENT_SUMMARY_ENTRY_SIZE;
         long offset = 0xffffffffL | ((eachThread & 0xffffffffL) << 32);
         write(offset, this.memoryImage, offsetAddress);
       }
 
-      for (; this.currentDpuId < this.description.nrOfDpusPerControlInterface; this.currentDpuId++) {
-        loadMemoryImage();
-      }
-      this.currentCiId++;
-
-      for (; this.currentCiId < this.description.nrOfControlInterfaces; this.currentCiId++) {
-        this.currentDpuId = 0;
-
-        for (; this.currentDpuId < this.description.nrOfDpusPerControlInterface; this.currentDpuId++) {
+      for (; this.currentRankId < nrRanks; this.currentRankId++) {
+        nrDpus = this.ranks.get(this.currentRankId).dpus().size();
+        for (; this.currentDpuId < nrDpus; this.currentDpuId++) {
           loadMemoryImage();
         }
+        this.currentDpuId = 0;
       }
     }
 
     this.indexLoaded = true;
   }
 
-  private void loadMemoryImage() {
-    this.ranks[this.currentRankId]
-        .get(this.currentCiId, this.currentDpuId)
-        .copyToMram(MEMORY_IMAGE_OFFSET, this.memoryImage, this.currentImageOffset);
+  private void loadMemoryImage() throws DpuException {
+    Dpu dpu = this.ranks.get(this.currentRankId).dpus().get(this.currentDpuId);
+    DpuSymbol imageSymbol = new DpuSymbol(0x08000000 | MEMORY_IMAGE_OFFSET, this.memoryImage.length);
+    dpu.copy(imageSymbol, this.memoryImage);
   }
 
   private void resetMemoryImageContent() {
@@ -520,10 +495,8 @@ public final class DpuManager implements Closeable {
   }
 
   @Override
-  public void close() throws IOException {
-    for (DpuRank rank : this.ranks) {
-      rank.close();
-    }
+  public void close() throws DpuException {
+    this.dpuSystem.free();
   }
 
   final static class DpuResults {
@@ -546,19 +519,17 @@ public final class DpuManager implements Closeable {
   }
 
   final static class RawDpuResult {
-    int ciId;
     int dpuId;
 
     byte[] outputs = new byte[OUTPUTS_BUFFER_SIZE];
     byte[] idfOutput = new byte[IDF_OUTPUT_SIZE];
 
-    public RawDpuResult(int ciId, int dpuId) {
-      this.ciId = ciId;
+    public RawDpuResult(int dpuId) {
       this.dpuId = dpuId;
     }
   }
 
-  public DpuResults search(int fieldId, BytesRef target) {
+  public DpuResults search(int fieldId, BytesRef target) throws DpuException {
     if (!this.indexLoaded) {
       finalizeIndexLoading();
     }
@@ -576,123 +547,85 @@ public final class DpuManager implements Closeable {
     return results;
   }
 
-  private void loadQuery(int fieldId, BytesRef target) {
+  private void loadQuery(int fieldId, BytesRef target) throws DpuException {
     assert (target.length <= MAX_VALUE_SIZE) : "UPMEM specified query value is too big";
 
-    DpuMramTransfer transfer = new DpuMramTransfer(this.description.nrOfControlInterfaces, this.description.nrOfDpusPerControlInterface);
+    DpuSymbol querySymbol = new DpuSymbol(0x08000000 | QUERY_BUFFER_OFFSET, QUERY_BUFFER_SIZE);
 
     byte[] query = new byte[QUERY_BUFFER_SIZE];
     System.arraycopy(target.bytes, target.offset, query, 0, target.length);
 
     write(fieldId, query, MAX_VALUE_SIZE);
 
-    for (int eachCi = 0; eachCi < this.description.nrOfControlInterfaces; eachCi++) {
-      for (int eachDpu = 0; eachDpu < this.description.nrOfDpusPerControlInterface; eachDpu++) {
-        transfer.add(eachCi, eachDpu, query);
-      }
+    this.dpuSystem.async().copy(querySymbol, query);
+  }
+
+  private void fetchAndParseResults(DpuSet rank, int rankIdx, DpuResults results) throws DpuException {
+    List<Dpu> dpus = rank.dpus();
+    int nrDpus = dpus.size();
+
+    RawDpuResult[] rawResults = new RawDpuResult[nrDpus];
+    byte[][] outputs = new byte[nrDpus][];
+    byte[][] idfOutputs = new byte[nrDpus][];
+
+    for (int eachDpu = 0; eachDpu < nrDpus; eachDpu++) {
+        RawDpuResult result = new RawDpuResult(eachDpu);
+        rawResults[eachDpu] = result;
+        outputs[eachDpu] = result.outputs;
+        idfOutputs[eachDpu] = result.idfOutput;
     }
 
-    for (DpuRank rank : this.ranks) {
-        rank.copyToMrams(transfer, QUERY_BUFFER_SIZE, QUERY_BUFFER_OFFSET);
+    DpuSymbol outputsSymbol = new DpuSymbol(0x08000000 | OUTPUTS_BUFFER_OFFSET, OUTPUTS_BUFFER_SIZE);
+    DpuSymbol idfOutputsSymbol = new DpuSymbol(0x08000000 | IDF_OUTPUT_OFFSET, IDF_OUTPUT_SIZE);
+
+    rank.copy(outputs, outputsSymbol);
+    rank.copy(idfOutputs, idfOutputsSymbol);
+
+    int docFreq = 0;
+    long totalTermFreq = 0;
+    List<DpuDocResult> docs = new ArrayList<>();
+
+    for (RawDpuResult result : rawResults) {
+      docFreq += readInt(result.idfOutput, DPU_IDF_OUTPUT_DOC_FREQ_OFFSET);
+      totalTermFreq += readLong(result.idfOutput, DPU_IDF_OUTPUT_TOTAL_TERM_FREQ_OFFSET);
+
+      boolean finished = false;
+      int currentOffset = 0;
+      int currentThreadId = 0;
+      do {
+        int docId = readInt(result.outputs, currentOffset + DPU_OUTPUT_DOC_ID_OFFSET);
+
+        if (docId == -1) {
+          if (currentThreadId == (NR_THREADS - 1)) {
+            finished = true;
+          }
+
+          currentThreadId++;
+          currentOffset = currentThreadId * OUTPUTS_PER_THREAD * DPU_OUTPUT_LENGTH;
+        } else {
+          int freq = readInt(result.outputs, currentOffset + DPU_OUTPUT_FREQ_OFFSET);
+          int docNorm = readInt(result.outputs, currentOffset + DPU_OUTPUT_DOC_NORM_OFFSET);
+
+          int docBase = this.docBases[rankIdx][result.dpuId][currentThreadId];
+          docs.add(new DpuDocResult(docBase + docId, freq, docNorm));
+          currentOffset += DPU_OUTPUT_LENGTH;
+        }
+      } while (!finished);
+
+      synchronized (results) {
+          results.docFreq += docFreq;
+          results.totalTermFreq += totalTermFreq;
+          results.results.addAll(docs);
+      }
     }
   }
 
-  private DpuResults doSearch() {
+  private DpuResults doSearch() throws DpuException {
     DpuResults results = new DpuResults();
-    List<RawDpuResult> resultList = new ArrayList<>(this.description.nrOfControlInterfaces * this.description.nrOfControlInterfaces);
 
-    for (DpuRank rank : this.ranks) {
-      rank.launch(SYSTEM_THREAD);
-    }
-
-    int[] runBitfield = new int[this.description.nrOfControlInterfaces];
-    int[] faultBitfield = new int[this.description.nrOfControlInterfaces];
-
-    List<DpuRank> runningRanks = new ArrayList<>(this.ranks.length);
-    runningRanks.addAll(Arrays.asList(this.ranks));
-    Set<DpuRank> faultyRanks = new HashSet<>(this.ranks.length);
-    Set<DpuRank> newlyStoppedRanks = new HashSet<>(this.ranks.length);
-
-    while (!runningRanks.isEmpty()) {
-      for (DpuRank rank : runningRanks) {
-        rank.poll(runBitfield, faultBitfield);
-
-        boolean stopped = true;
-        boolean faulting = false;
-
-        for (int eachCi = 0; eachCi < this.description.nrOfControlInterfaces; eachCi++) {
-          if (runBitfield[eachCi] != 0) {
-            if (faultBitfield[eachCi] != 0) {
-              faulting = true;
-
-              for (int eachDpu = 0; eachDpu < this.description.nrOfDpusPerControlInterface; eachDpu++) {
-                if ((faultBitfield[eachCi] & (1 << eachDpu)) != 0) {
-                  System.out.println(rank.get(eachCi, eachDpu).coreDump().report());
-                }
-              }
-            } else {
-              stopped = false;
-            }
-          }
-        }
-
-        if (faulting) {
-          faultyRanks.add(rank);
-          newlyStoppedRanks.add(rank);
-        } else if (stopped) {
-          newlyStoppedRanks.add(rank);
-
-          DpuMramTransfer outputsTransfer = new DpuMramTransfer(this.description.nrOfControlInterfaces, this.description.nrOfDpusPerControlInterface);
-          DpuMramTransfer idfOutputsTransfer = new DpuMramTransfer(this.description.nrOfControlInterfaces, this.description.nrOfDpusPerControlInterface);
-          for (int eachCi = 0; eachCi < this.description.nrOfControlInterfaces; eachCi++) {
-            for (int eachDpu = 0; eachDpu < this.description.nrOfDpusPerControlInterface; eachDpu++) {
-              RawDpuResult result = new RawDpuResult(eachCi, eachDpu);
-              resultList.add(result);
-              outputsTransfer.add(eachCi, eachDpu, result.outputs);
-              idfOutputsTransfer.add(eachCi, eachDpu, result.idfOutput);
-            }
-          }
-
-          rank.copyFromMrams(outputsTransfer, OUTPUTS_BUFFER_SIZE, OUTPUTS_BUFFER_OFFSET);
-          rank.copyFromMrams(idfOutputsTransfer, IDF_OUTPUT_SIZE, IDF_OUTPUT_OFFSET);
-
-          for (RawDpuResult result : resultList) {
-            results.docFreq += readInt(result.idfOutput, DPU_IDF_OUTPUT_DOC_FREQ_OFFSET);
-            results.totalTermFreq += readLong(result.idfOutput, DPU_IDF_OUTPUT_TOTAL_TERM_FREQ_OFFSET);
-
-            boolean finished = false;
-            int currentOffset = 0;
-            int currentThreadId = 0;
-            do {
-              int docId = readInt(result.outputs, currentOffset + DPU_OUTPUT_DOC_ID_OFFSET);
-
-              if (docId == -1) {
-                if (currentThreadId == (NR_THREADS - 1)) {
-                  finished = true;
-                }
-
-                currentThreadId++;
-                currentOffset = currentThreadId * OUTPUTS_PER_THREAD * DPU_OUTPUT_LENGTH;
-              } else {
-                int freq = readInt(result.outputs, currentOffset + DPU_OUTPUT_FREQ_OFFSET);
-                int docNorm = readInt(result.outputs, currentOffset + DPU_OUTPUT_DOC_NORM_OFFSET);
-
-                int docBase = this.docBases.get(rank)[result.ciId][result.dpuId][currentThreadId];
-                results.results.add(new DpuDocResult(docBase + docId, freq, docNorm));
-                currentOffset += DPU_OUTPUT_LENGTH;
-              }
-            } while (!finished);
-          }
-
-          resultList.clear();
-        }
-      }
-
-      runningRanks.removeAll(newlyStoppedRanks);
-      newlyStoppedRanks.clear();
-    }
-
-    assert faultyRanks.isEmpty() : "UPMEM DPU execution fault";
+    this.dpuSystem.async().exec();
+    this.dpuSystem.async().call((rank, idx) -> fetchAndParseResults(rank, idx, results));
+    this.dpuSystem.async().sync();
 
     return results;
   }
