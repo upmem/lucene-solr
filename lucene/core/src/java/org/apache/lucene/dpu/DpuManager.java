@@ -442,40 +442,42 @@ public final class DpuManager implements AutoCloseable {
 
   private void finalizeIndexLoading() throws DpuException {
     int nrRanks = this.ranks.size();
-    int nrDpus = this.ranks.get(this.currentRankId).dpus().size();
-    if (this.currentThreadId != 0) {
-      for (int eachThread = this.currentThreadId; eachThread < NR_THREADS; eachThread++) {
-        int offsetAddress = SEGMENT_SUMMARY_OFFSET + eachThread * SEGMENT_SUMMARY_ENTRY_SIZE;
-        long offset = 0xffffffffL | ((eachThread & 0xffffffffL) << 32);
-        write(offset, this.memoryImage, offsetAddress);
-      }
-      loadMemoryImage();
-      resetMemoryImageContent();
-
-      this.currentThreadId = 0;
-      this.currentImageOffset = SEGMENTS_OFFSET;
-
-      if (this.currentDpuId == (nrDpus - 1)) {
-        this.currentDpuId = 0;
-        this.currentRankId++;
-      } else {
-        this.currentDpuId++;
-      }
-    }
-
     if (this.currentRankId < nrRanks) {
-      for (int eachThread = 0; eachThread < NR_THREADS; eachThread++) {
-        int offsetAddress = SEGMENT_SUMMARY_OFFSET + eachThread * SEGMENT_SUMMARY_ENTRY_SIZE;
-        long offset = 0xffffffffL | ((eachThread & 0xffffffffL) << 32);
-        write(offset, this.memoryImage, offsetAddress);
+      int nrDpus = this.ranks.get(this.currentRankId).dpus().size();
+      if (this.currentThreadId != 0) {
+        for (int eachThread = this.currentThreadId; eachThread < NR_THREADS; eachThread++) {
+          int offsetAddress = SEGMENT_SUMMARY_OFFSET + eachThread * SEGMENT_SUMMARY_ENTRY_SIZE;
+          long offset = 0xffffffffL | ((eachThread & 0xffffffffL) << 32);
+          write(offset, this.memoryImage, offsetAddress);
+        }
+        loadMemoryImage();
+        resetMemoryImageContent();
+
+        this.currentThreadId = 0;
+        this.currentImageOffset = SEGMENTS_OFFSET;
+
+        if (this.currentDpuId == (nrDpus - 1)) {
+          this.currentDpuId = 0;
+          this.currentRankId++;
+        } else {
+          this.currentDpuId++;
+        }
       }
 
-      for (; this.currentRankId < nrRanks; this.currentRankId++) {
-        nrDpus = this.ranks.get(this.currentRankId).dpus().size();
-        for (; this.currentDpuId < nrDpus; this.currentDpuId++) {
-          loadMemoryImage();
+      if (this.currentRankId < nrRanks) {
+        for (int eachThread = 0; eachThread < NR_THREADS; eachThread++) {
+          int offsetAddress = SEGMENT_SUMMARY_OFFSET + eachThread * SEGMENT_SUMMARY_ENTRY_SIZE;
+          long offset = 0xffffffffL | ((eachThread & 0xffffffffL) << 32);
+          write(offset, this.memoryImage, offsetAddress);
         }
-        this.currentDpuId = 0;
+
+        for (; this.currentRankId < nrRanks; this.currentRankId++) {
+          nrDpus = this.ranks.get(this.currentRankId).dpus().size();
+          for (; this.currentDpuId < nrDpus; this.currentDpuId++) {
+            loadMemoryImage();
+          }
+          this.currentDpuId = 0;
+        }
       }
     }
 
