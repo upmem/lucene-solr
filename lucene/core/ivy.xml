@@ -20,6 +20,6 @@
   <info organisation="org.apache.lucene" module="core"/>
   <!-- UPMEM -->
   <dependencies>
-    <dependency org="com.upmem" name="dpu" rev="2020.5.0"/>
+    <dependency org="com.upmem" name="dpu" rev="2020.5.1"/>
   </dependencies>
 </ivy-module>
