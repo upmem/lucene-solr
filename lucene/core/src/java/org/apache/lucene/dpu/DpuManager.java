@@ -187,12 +187,12 @@ public final class DpuManager implements AutoCloseable {
     this.dpuSystem.load(executableFileName);
 
     this.ranks = this.dpuSystem.ranks();
-    int nrDpusPerRank = this.description.nrOfControlInterfaces * this.description.nrOfDpusPerControlInterface;
+    int nrDpusPerRank = this.description.getNrOfControlInterfaces() * this.description.getNrOfDpusPerControlInterface();
 
     this.docBases = new int[this.ranks.size()][nrDpusPerRank][NR_THREADS];
     this.cachedResults = new HashMap<>();
 
-    this.memoryImage = new byte[this.description.mramSizeInBytes];
+    this.memoryImage = new byte[this.description.getMramSizeInBytes()];
     this.currentImageOffset = SEGMENTS_OFFSET;
     this.indexLoaded = false;
 
