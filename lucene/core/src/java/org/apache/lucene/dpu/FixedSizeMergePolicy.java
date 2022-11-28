@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.PriorityQueue;
 import java.util.Set;
 
@@ -135,30 +136,27 @@ public class FixedSizeMergePolicy extends MergePolicy {
 
     sortedInfos.removeIf(segSizeDocs -> segmentsToMerge.get(segSizeDocs.segInfo) == null || merging.contains(segSizeDocs.segInfo) || segSizeDocs.sizeInBytes >= this.sizeTargetInBytes);
 
-    PriorityQueue<SegmentMergeGroup> mergeGroups = new PriorityQueue<>((o1, o2) -> o2.sizeInBytes - o1.sizeInBytes);
+    TreeMap<Long, SegmentMergeGroup> mergeGroups = new TreeMap<>();
 
     for (SegmentSizeAndDocs info : sortedInfos) {
       SegmentMergeGroup foundGroup = null;
-      for (SegmentMergeGroup group : mergeGroups) {
-        if (group.sizeInBytes + info.sizeInBytes <= this.sizeTargetInBytes) {
-          foundGroup = group;
-          break;
-        }
+      Map.Entry<Long, SegmentMergeGroup> groupEntry = mergeGroups.floorEntry(this.sizeTargetInBytes - info.sizeInBytes);
+      if(groupEntry != null) {
+        foundGroup = groupEntry.getValue();
+        mergeGroups.remove(groupEntry);
       }
-      if (foundGroup == null) {
+      else {
         foundGroup = new SegmentMergeGroup();
-      } else {
-        mergeGroups.remove(foundGroup);
       }
+
       foundGroup.add(info);
-      mergeGroups.add(foundGroup);
+      mergeGroups.put(groupEntry != null ? groupEntry.getKey() + info.sizeInBytes : info.sizeInBytes,
+              foundGroup);
     }
 
     if (mergeGroups.size() > maxSegmentCount) {
       throw new RuntimeException("UPMEM too many segments after merge");
     }
-
-    mergeGroups.removeIf(group -> group.segments.size() == 1);
 
     if (mergeGroups.size() == 0) {
       return null;
@@ -166,8 +164,9 @@ public class FixedSizeMergePolicy extends MergePolicy {
 
     MergeSpecification specs = new MergeSpecification();
 
-    for (SegmentMergeGroup group : mergeGroups) {
-      specs.add(new OneMerge(group.segments));
+    for (Map.Entry<Long, SegmentMergeGroup> entry : mergeGroups.entrySet()) {
+      if(entry.getValue().segments.size() != 1)
+        specs.add(new OneMerge(entry.getValue().segments));
     }
 
     return specs;
