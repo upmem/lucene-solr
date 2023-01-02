@@ -7,7 +7,6 @@
 
 #include "context.h"
 
-void search(flat_search_context_t *ctx, uint32_t field, char *value);
-void no_search();
+void search(flat_search_context_t *ctx, uint32_t field, char *value, uint32_t *nb_output);
 
 #endif // DPU_POC_SEARCH_H

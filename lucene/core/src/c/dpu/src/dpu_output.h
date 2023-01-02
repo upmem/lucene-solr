@@ -12,7 +12,7 @@
 
 typedef struct {
     uint32_t doc_id;
-    uint32_t unused;
+    uint32_t tid;
     uint32_t freq;
     uint32_t doc_norm;
 } dpu_output_t;

@@ -144,6 +144,7 @@ public final class DpuManager implements AutoCloseable {
   private static final int DPU_FIELD_READER_LENGTH = DPU_FIELD_READER_SUM_TOTAL_TERM_FREQ_OFFSET + 8;
 
   private static final int DPU_OUTPUT_DOC_ID_OFFSET = 0;
+  private static final int DPU_OUTPUT_TID_OFFSET = 4;
   private static final int DPU_OUTPUT_FREQ_OFFSET = 8;
   private static final int DPU_OUTPUT_DOC_NORM_OFFSET = 12;
   private static final int DPU_OUTPUT_LENGTH = 16;
@@ -523,11 +524,12 @@ public final class DpuManager implements AutoCloseable {
   final static class RawDpuResult {
     int dpuId;
 
-    byte[] outputs = new byte[OUTPUTS_BUFFER_SIZE];
+    byte[] outputs;
     byte[] idfOutput = new byte[IDF_OUTPUT_SIZE];
 
-    public RawDpuResult(int dpuId) {
+    public RawDpuResult(int dpuId, int nr_output) {
       this.dpuId = dpuId;
+      this.outputs = new byte[nr_output];
     }
   }
 
@@ -566,12 +568,26 @@ public final class DpuManager implements AutoCloseable {
     List<Dpu> dpus = rank.dpus();
     int nrDpus = dpus.size();
 
+    //first copy the size for each DPU
+    //then compute the max size for this rank
+    //then transfer the data
+    byte[][] nr_outputs = new byte[nrDpus][Integer.BYTES];
+    rank.copy(nr_outputs, "nb_output");
+    int max = 0;
+    for(byte[] nr_output : nr_outputs) {
+      ByteBuffer wrapped = ByteBuffer.wrap(nr_output); 
+      wrapped.order(ByteOrder.LITTLE_ENDIAN);
+      int val = wrapped.getInt();
+      if(val > max)
+        max = val;
+    }
+
     RawDpuResult[] rawResults = new RawDpuResult[nrDpus];
     byte[][] outputs = new byte[nrDpus][];
     byte[][] idfOutputs = new byte[nrDpus][];
 
     for (int eachDpu = 0; eachDpu < nrDpus; eachDpu++) {
-        RawDpuResult result = new RawDpuResult(eachDpu);
+        RawDpuResult result = new RawDpuResult(eachDpu, max * OUTPUT_SIZE);
         rawResults[eachDpu] = result;
         outputs[eachDpu] = result.outputs;
         idfOutputs[eachDpu] = result.idfOutput;
@@ -587,32 +603,36 @@ public final class DpuManager implements AutoCloseable {
     long totalTermFreq = 0;
     List<DpuDocResult> docs = new ArrayList<>();
 
-    for (RawDpuResult result : rawResults) {
+    for (int eachDpu = 0; eachDpu < nrDpus; eachDpu++) {
+    
+      RawDpuResult result = rawResults[eachDpu];
+
+      ByteBuffer wrapped = ByteBuffer.wrap(nr_outputs[eachDpu]); 
+      wrapped.order(ByteOrder.LITTLE_ENDIAN);
+      int nrOutputs = wrapped.getInt();
+
       docFreq += readInt(result.idfOutput, DPU_IDF_OUTPUT_DOC_FREQ_OFFSET);
       totalTermFreq += readLong(result.idfOutput, DPU_IDF_OUTPUT_TOTAL_TERM_FREQ_OFFSET);
 
-      boolean finished = false;
       int currentOffset = 0;
-      int currentThreadId = 0;
-      do {
+      for(int eachResult = 0; eachResult < nrOutputs; ++eachResult) {
+
         int docId = readInt(result.outputs, currentOffset + DPU_OUTPUT_DOC_ID_OFFSET);
 
+        // ignore invalid result
         if (docId == -1) {
-          if (currentThreadId == (NR_THREADS - 1)) {
-            finished = true;
-          }
-
-          currentThreadId++;
-          currentOffset = currentThreadId * OUTPUTS_PER_THREAD * DPU_OUTPUT_LENGTH;
-        } else {
-          int freq = readInt(result.outputs, currentOffset + DPU_OUTPUT_FREQ_OFFSET);
-          int docNorm = readInt(result.outputs, currentOffset + DPU_OUTPUT_DOC_NORM_OFFSET);
-
-          int docBase = this.docBases[rankIdx][result.dpuId][currentThreadId];
-          docs.add(new DpuDocResult(docBase + docId, freq, docNorm));
           currentOffset += DPU_OUTPUT_LENGTH;
+          continue;
         }
-      } while (!finished);
+
+        int tid = readInt(result.outputs, currentOffset + DPU_OUTPUT_TID_OFFSET);
+        int freq = readInt(result.outputs, currentOffset + DPU_OUTPUT_FREQ_OFFSET);
+        int docNorm = readInt(result.outputs, currentOffset + DPU_OUTPUT_DOC_NORM_OFFSET);
+
+        int docBase = this.docBases[rankIdx][result.dpuId][tid];
+        docs.add(new DpuDocResult(docBase + docId, freq, docNorm));
+        currentOffset += DPU_OUTPUT_LENGTH;
+      }
 
       synchronized (results) {
           results.docFreq += docFreq;

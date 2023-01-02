@@ -26,6 +26,8 @@ _Static_assert(
 #define OUTPUTS_BUFFER_SIZE (OUTPUTS_BUFFER_SIZE_PER_THREAD * NR_TASKLETS)
 _Static_assert(sizeof(dpu_output_t) == OUTPUT_SIZE, "check that OUTPUT_SIZE matches the effective size of dpu_ouput_t");
 
+#define OUTPUTS_PER_TASKLET_BATCH 8
+
 #define QUERY_BUFFER_OFFSET (DMA_ALIGNED(OUTPUTS_BUFFER_OFFSET + OUTPUTS_BUFFER_SIZE))
 #define QUERY_BUFFER_SIZE 24
 _Static_assert(QUERY_BUFFER_SIZE == sizeof(query_t), "Check that QUERY_BUFFER_SIZE matches the effective size of query_t");

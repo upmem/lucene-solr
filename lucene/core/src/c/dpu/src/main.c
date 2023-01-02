@@ -13,6 +13,7 @@
 #include "search.h"
 
 BARRIER_INIT(init_barrier, NR_TASKLETS)
+__host unsigned int nb_output = 0;
 
 int main(void)
 {
@@ -26,6 +27,7 @@ int main(void)
         init_idf_output();
         perfcounter_config(COUNT_CYCLES, true);
         query = fetch_query(true);
+        nb_output = 0;
     }
 
     barrier_wait(&init_barrier);
@@ -33,9 +35,9 @@ int main(void)
     context = initialize_flat_context(task_id);
 
     if (context == NULL) {
-        barrier_wait(&init_barrier);
 
-        no_search();
+      barrier_wait(&init_barrier);
+      accumulate_idf_output(0, 0, 0);
     } else {
         if (task_id != 0) {
             query = fetch_query(false);
@@ -44,7 +46,7 @@ int main(void)
         barrier_wait(&init_barrier);
 
         start = perfcounter_get();
-        search(context, query->field_id, query->value);
+        search(context, query->field_id, query->value, &nb_output);
         end = perfcounter_get();
 
         /* printf("[%i] perfcounter:%u\n", task_id, (unsigned)(end - start)); */
