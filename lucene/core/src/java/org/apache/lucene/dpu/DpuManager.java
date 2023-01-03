@@ -633,12 +633,12 @@ public final class DpuManager implements AutoCloseable {
         docs.add(new DpuDocResult(docBase + docId, freq, docNorm));
         currentOffset += DPU_OUTPUT_LENGTH;
       }
+    }
 
-      synchronized (results) {
-          results.docFreq += docFreq;
-          results.totalTermFreq += totalTermFreq;
-          results.results.addAll(docs);
-      }
+    synchronized (results) {
+      results.docFreq += docFreq;
+      results.totalTermFreq += totalTermFreq;
+      results.results.addAll(docs);
     }
   }
 
